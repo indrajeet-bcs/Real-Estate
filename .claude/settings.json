@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(rm -f src/App.css src/assets/react.svg)",
+      "Bash(rmdir src/assets)",
+      "Bash(python -c \"import PyPDF2; r=PyPDF2.PdfReader\\('Final Userflow Real Estate.pdf'\\); print\\('pages:', len\\(r.pages\\)\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(node --check src/server.js)",
+      "Bash(node --input-type=module -e \"import\\('./src/app.js'\\).then\\(\\(\\)=>console.log\\('all modules import OK'\\)\\).catch\\(e=>{console.error\\('IMPORT ERROR:',e.message\\);process.exit\\(1\\)}\\)\")",
+      "Bash(where mongod *)",
+      "Bash(node smoke-test.mjs)",
+      "Bash(node --input-type=module -e \"import\\('./src/app.js'\\).then\\(\\(\\)=>console.log\\('ALL MODULES IMPORT OK'\\)\\).catch\\(e=>{console.error\\('IMPORT ERROR:',e.message,'\\\\n',e.stack\\);process.exit\\(1\\)}\\)\")",
+      "Bash(node smoke-full.mjs)",
+      "Bash(node repro.mjs)",
+      "Bash(node testseed.mjs)",
+      "Bash(node verifyseed.mjs)",
+      "Bash(xargs -0 sed -i -e 's#bg-slate-900/50#bg-white#g' -e s/bg-slate-950/bg-slate-50/g -e s/bg-slate-900/bg-white/g -e 's#bg-slate-800/50#bg-slate-100#g' -e s/bg-slate-800/bg-slate-100/g -e s/bg-slate-700/bg-slate-200/g -e s/border-slate-800/border-slate-200/g -e s/border-slate-700/border-slate-300/g -e s/text-white/text-slate-900/g -e s/text-slate-200/text-slate-800/g -e s/text-slate-300/text-slate-700/g -e s/text-slate-600/text-slate-500/g -e s/text-slate-400/text-slate-600/g -e s/placeholder-slate-500/placeholder-slate-400/g -e s/hover:bg-indigo-500/hover:bg-blue-700/g -e s/border-indigo-500/border-blue-500/g -e s/focus:border-indigo-500/focus:border-blue-500/g -e s/focus:ring-indigo-500/focus:ring-blue-500/g -e s/bg-indigo-950/bg-blue-50/g -e s/bg-indigo-600/bg-blue-600/g -e s/indigo-500/blue-600/g -e s/indigo-400/blue-600/g -e s/indigo-300/blue-700/g -e s/indigo-200/blue-700/g -e s/text-emerald-400/text-emerald-600/g -e s/text-amber-400/text-amber-600/g -e s/text-red-400/text-red-600/g)"
+    ]
+  }
+}
