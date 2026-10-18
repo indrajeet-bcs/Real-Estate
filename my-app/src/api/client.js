@@ -3,7 +3,7 @@ import axios from 'axios'
 // Central axios instance. Access token is held in memory (set by AuthContext)
 // and attached per-request; the refresh token lives in an httpOnly cookie.
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   withCredentials: true, // send the refresh cookie
 })
 
