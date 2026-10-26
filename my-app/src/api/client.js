@@ -2,8 +2,13 @@ import axios from 'axios'
 
 // Central axios instance. Access token is held in memory (set by AuthContext)
 // and attached per-request; the refresh token lives in an httpOnly cookie.
+const rawUrl = import.meta.env.VITE_API_URL || '/api'
+const baseURL = (rawUrl.startsWith('http') && !rawUrl.endsWith('/api') && !rawUrl.endsWith('/api/'))
+  ? `${rawUrl.replace(/\/+$/, '')}/api`
+  : rawUrl
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL,
   withCredentials: true, // send the refresh cookie
 })
 
