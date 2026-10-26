@@ -20,7 +20,10 @@ function refreshCookieOptions() {
   return {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? 'strict' : 'lax',
+    // 'none' is required for cross-origin requests (Vercel ↔ Render).
+    // Browsers reject SameSite=Strict/Lax on cross-site credentialed requests.
+    // 'none' is only sent over HTTPS (secure: true in prod guards this).
+    sameSite: isProd ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
     path: '/api/auth',
   }
