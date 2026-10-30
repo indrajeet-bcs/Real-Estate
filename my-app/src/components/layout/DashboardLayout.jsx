@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { useToast } from '../../context/ToastContext.jsx'
 import { NAV_BY_ROLE } from '../../lib/navConfig.js'
 import { ROLE_LABELS, ROLES } from '../../lib/constants.js'
 import { actionCenterApi, branchSettingsApi } from '../../api/resources.js'
@@ -10,6 +11,7 @@ import NotificationBell from './NotificationBell.jsx'
 // + top bar with the current user and logout.
 export default function DashboardLayout() {
   const { user, logout } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
   const nav = NAV_BY_ROLE[user.role] || []
@@ -86,6 +88,7 @@ export default function DashboardLayout() {
 
   async function handleLogout() {
     await logout()
+    toast.success('Logout successfully')
     navigate('/login', { replace: true })
   }
 

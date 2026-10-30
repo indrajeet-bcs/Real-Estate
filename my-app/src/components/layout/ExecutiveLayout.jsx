@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { useToast } from '../../context/ToastContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
 
 // Mobile phone-frame shell for the Sales Executive (ported from the prototype's
@@ -40,6 +41,7 @@ const FAB_ACTIONS = [
 
 export default function ExecutiveLayout() {
   const { user, logout } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
   const [fabOpen, setFabOpen] = useState(false)
@@ -48,6 +50,7 @@ export default function ExecutiveLayout() {
 
   async function handleLogout() {
     await logout()
+    toast.success('Logout successfully')
     navigate('/login', { replace: true })
   }
 

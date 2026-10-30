@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { useToast } from '../../context/ToastContext.jsx'
 import { ROLE_HOME } from '../../lib/constants.js'
 
 export default function LoginPage() {
   const { login, isAuthenticated, user, loading } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   if (!loading && isAuthenticated) {
@@ -19,14 +20,14 @@ export default function LoginPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError('')
     setSubmitting(true)
     try {
       const loggedIn = await login(email, password)
+      toast.success('Login successfully')
       const dest = location.state?.from?.pathname || ROLE_HOME[loggedIn.role] || '/'
       navigate(dest, { replace: true })
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.')
+    } catch {
+      toast.error('Invalid credentials')
     } finally {
       setSubmitting(false)
     }
@@ -47,11 +48,6 @@ export default function LoginPage() {
           onSubmit={handleSubmit}
           className="space-y-5 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl"
         >
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
