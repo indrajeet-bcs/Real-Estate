@@ -17,6 +17,7 @@ export default function DashboardLayout() {
   const [expandedDropdown, setExpandedDropdown] = useState(null)
   const [actionCount, setActionCount] = useState(0)
   const [geofenceRadius, setGeofenceRadius] = useState(200)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   // Mobile drawer open state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -280,7 +281,7 @@ export default function DashboardLayout() {
               </div>
             )}
             <button
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"
             >
               Logout
@@ -292,6 +293,30 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Logout confirmation popup */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">Confirm Logout</h3>
+            <p className="mt-2 text-sm text-slate-500">Are you sure you want to logout?</p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+              >
+                Yes, Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
