@@ -55,6 +55,7 @@ export const createVisitSchema = z.object({
   project: objectId,
   builder: objectId.optional(),
   unit: objectId.optional(),
+  assignedTo: objectId.optional(),
   scheduledAt: z.coerce.date(),
   visitType: z.enum(VISIT_TYPES).optional(),
   meetingPoint: z.string().optional(),

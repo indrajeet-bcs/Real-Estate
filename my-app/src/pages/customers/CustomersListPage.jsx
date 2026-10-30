@@ -132,11 +132,37 @@ export default function CustomersListPage({ title = 'My Customers', subtitle, ba
 function CreateLeadModal({ onClose, onCreated }) {
   const toast = useToast()
   const [form, setForm] = useState({ name: '', mobile: '', email: '', source: 'walk_in' })
+  const [touched, setTouched] = useState({ mobile: false })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  const handleMobileChange = (e) => {
+    let val = e.target.value.replace(/\D/g, '')
+    if (val.length === 12 && val.startsWith('91')) {
+      val = val.slice(2)
+    } else if (val.length === 11 && val.startsWith('0')) {
+      val = val.slice(1)
+    }
+    val = val.slice(0, 10)
+    setForm((f) => ({ ...f, mobile: val }))
+  }
+
+  const isMobileValid = /^[6-9]\d{9}$/.test(form.mobile)
+  const mobileError = (() => {
+    if (!touched.mobile && !form.mobile) return ''
+    if (!form.mobile) return 'Mobile number is required'
+    if (form.mobile.length < 10) return `Mobile number must be exactly 10 digits (${form.mobile.length}/10)`
+    if (!/^[6-9]/.test(form.mobile)) return 'Mobile number must start with 6, 7, 8, or 9'
+    return ''
+  })()
+
   async function submit(e) {
     e.preventDefault()
+    setTouched({ mobile: true })
+    if (!isMobileValid) {
+      toast.error('Please enter a valid 10-digit mobile number starting with 6-9')
+      return
+    }
     setBusy(true)
     try {
       await customersApi.create(form)
@@ -156,13 +182,25 @@ function CreateLeadModal({ onClose, onCreated }) {
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>{busy ? 'Saving…' : 'Create'}</Button>
+          <Button onClick={submit} disabled={busy || form.name.trim().length < 2 || !isMobileValid}>
+            {busy ? 'Saving…' : 'Create'}
+          </Button>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
         <Input label="Full name" required value={form.name} onChange={set('name')} />
-        <Input label="Mobile" required value={form.mobile} onChange={set('mobile')} />
+        <Input
+          label="Mobile"
+          required
+          type="tel"
+          placeholder="10-digit mobile number"
+          maxLength={10}
+          value={form.mobile}
+          onChange={handleMobileChange}
+          onBlur={() => setTouched((t) => ({ ...t, mobile: true }))}
+          error={mobileError}
+        />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} />
         <Select label="Source" value={form.source} onChange={set('source')}>
           {['walk_in', 'website', 'referral', 'social_media', 'call', 'portal', 'other'].map((s) => (

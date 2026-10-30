@@ -5,7 +5,7 @@ const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id')
 
 export const createCustomerSchema = z.object({
   name: z.string().min(2, 'Name is required'),
-  mobile: z.string().min(7, 'Valid mobile is required'),
+  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Must be a valid 10-digit mobile number starting with 6, 7, 8, or 9'),
   altMobile: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   address: z.string().optional(),
