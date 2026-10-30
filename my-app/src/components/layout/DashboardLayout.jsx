@@ -17,10 +17,36 @@ export default function DashboardLayout() {
   const [expandedDropdown, setExpandedDropdown] = useState(null)
   const [actionCount, setActionCount] = useState(0)
   const [geofenceRadius, setGeofenceRadius] = useState(200)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Mobile drawer open state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  // Desktop sidebar collapse/expand state (persisted in localStorage)
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem('crm_sidebar_desktop_open')
+      return saved !== null ? saved === 'true' : true
+    } catch {
+      return true
+    }
+  })
 
   // Close the mobile sidebar drawer whenever the route changes.
-  useEffect(() => { setSidebarOpen(false) }, [location.pathname])
+  useEffect(() => { setMobileSidebarOpen(false) }, [location.pathname])
+
+  // Persist desktop sidebar state
+  useEffect(() => {
+    try {
+      localStorage.setItem('crm_sidebar_desktop_open', String(desktopSidebarOpen))
+    } catch {}
+  }, [desktopSidebarOpen])
+
+  const toggleSidebar = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      setDesktopSidebarOpen((prev) => !prev)
+    } else {
+      setMobileSidebarOpen((prev) => !prev)
+    }
+  }, [])
 
   // Real geofence radius for the Sub-Admin's branch (footer card).
   useEffect(() => {
@@ -63,21 +89,58 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-800">
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800">
       {/* Mobile backdrop when the drawer is open */}
-      {sidebarOpen && <div className="fixed inset-0 z-30 bg-slate-900/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-slate-900/40 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Sidebar — static on desktop, off-canvas drawer on mobile */}
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-            RE
+      {/* Sidebar — static collapsible on desktop, off-canvas drawer on mobile */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-200 bg-white transition-all duration-300 ease-in-out lg:static lg:z-auto lg:h-screen lg:sticky lg:top-0 ${
+          mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        } ${
+          desktopSidebarOpen
+            ? 'w-64'
+            : 'w-64 lg:w-0 lg:border-r-0 lg:overflow-hidden lg:pointer-events-none'
+        }`}
+        aria-label="Sidebar navigation"
+      >
+        <div className="flex h-full w-64 shrink-0 flex-col">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white shadow-sm">
+                RE
+              </div>
+              <span className="font-semibold text-slate-900 tracking-tight">CRM</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                  setDesktopSidebarOpen(false)
+                } else {
+                  setMobileSidebarOpen(false)
+                }
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              title="Hide sidebar"
+              aria-label="Hide sidebar"
+            >
+              <span className="hidden lg:inline-flex">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </span>
+              <span className="inline-flex lg:hidden text-base leading-none">✕</span>
+            </button>
           </div>
-          <span className="font-semibold text-slate-900">CRM</span>
-          <button onClick={() => setSidebarOpen(false)} className="ml-auto text-slate-400 hover:text-slate-700 lg:hidden" aria-label="Close menu">✕</button>
-        </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          <nav className="flex-1 space-y-1 overflow-y-auto p-3 thin-scroll">
           {nav.map((item) => {
             if (item.type === 'group') {
               return (
@@ -181,13 +244,24 @@ export default function DashboardLayout() {
         <div className="border-t border-slate-200 p-4 text-xs text-slate-500">
           {ROLE_LABELS[user.role]}
         </div>
+        </div>
       </aside>
 
       {/* Main */}
-      <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
+      <div className="flex flex-1 flex-col min-w-0 h-screen overflow-hidden">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 z-20 shadow-sm">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Open menu">☰</button>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:bg-slate-200"
+              title={desktopSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+              aria-label={desktopSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <h2 className="text-sm font-medium text-slate-600">
               {ROLE_LABELS[user.role]} Workspace
             </h2>

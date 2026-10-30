@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { notificationsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
@@ -80,11 +80,33 @@ const FILTERS = [['all', 'All'], ['unread', 'Unread'], ['read', 'Read'], ['high'
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
+  const [visible, setVisible] = useState(false) // drives CSS transition
+  const closeTimer = useRef(null)
   const [filter, setFilter] = useState('all')
   const [detail, setDetail] = useState(null) // selected notification for details view
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data, meta, refetch } = useFetch(useCallback(() => notificationsApi.list({ limit: 100 }), []))
+
+  // Animate open: mount first, then set visible on next frame so transition fires.
+  function openDrawer() {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
+    setOpen(true)
+    requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
+  }
+
+  // Animate close: remove visible (triggers CSS out-transition), then unmount after 300 ms.
+  function startClose() {
+    setVisible(false)
+    closeTimer.current = setTimeout(() => {
+      setOpen(false)
+      setDetail(null)
+      setFilter('all')
+    }, 300)
+  }
+
+  // Clean up timer on unmount.
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current) }, [])
 
   // Near-real-time delivery without a websocket layer: poll every 45s and refetch
   // whenever the tab regains focus, so remarks/updates from other roles surface
@@ -120,16 +142,16 @@ export default function NotificationBell() {
     if (!n.read) { notificationsApi.markRead(n._id).then(refetch).catch(() => {}) }
   }
   function openRecord(n) {
-    setOpen(false); setDetail(null)
+    startClose(); setDetail(null)
     if (!n.read) { try { notificationsApi.markRead(n._id) } catch { /* ignore */ } refetch() }
     navigate(targetPath(n, user?.role))
   }
-  function closeDrawer() { setOpen(false); setDetail(null); setFilter('all') }
+  function closeDrawer() { startClose() }
 
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={openDrawer}
         className="relative rounded-lg border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-100"
         title="Notifications"
       >
@@ -143,9 +165,18 @@ export default function NotificationBell() {
 
       {open && (
         <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-slate-900/40" onClick={closeDrawer} />
+          {/* Backdrop — fades in/out */}
+          <div
+            className="absolute inset-0 bg-slate-900/40 transition-opacity duration-300"
+            style={{ opacity: visible ? 1 : 0 }}
+            onClick={closeDrawer}
+          />
 
-          <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+          {/* Drawer panel — slides in from the right */}
+          <div
+            className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ease-out"
+            style={{ transform: visible ? 'translateX(0)' : 'translateX(100%)' }}
+          >
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>

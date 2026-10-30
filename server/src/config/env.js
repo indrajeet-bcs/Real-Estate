@@ -1,10 +1,17 @@
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Load from server/.env first, then fallback to current working directory
+dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 dotenv.config()
 
 const required = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET']
 for (const key of required) {
-  if (!process.env[key]) {
+  if (!process.env[key] && !process.env.MONGODB_URI) {
     // eslint-disable-next-line no-console
     console.warn(`[env] Warning: ${key} is not set. Check your .env file.`)
   }
@@ -14,7 +21,7 @@ export const env = {
   port: Number(process.env.PORT) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
-  mongoUri: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/real_estate_crm',
+  mongoUri: process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/real_estate_crm',
 
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret',

@@ -14,14 +14,9 @@ Single source of truth for every role's login. Roles (highest → lowest authori
 
 | Name | Email | Password | Status | Source |
 |------|-------|----------|--------|--------|
-| Besto RE | `bestore@mail.com` | `Test@123` | ✅ **active — verified working** | `seedSuperAdmin.js` |
-| Platform Owner | `superadmin@crm.local` | ⚠️ **unknown** (NOT `SuperAdmin@123`) | active, but login fails | see note |
+| Platform Owner | `superadmin@crm.local` | `Password@123` | ✅ **active — verified working** | Live DB |
 
-> ⚠️ **`superadmin@crm.local` does not accept `SuperAdmin@123`.** The account predates the
-> `.env` seed value, and [`seed.js`](server/src/utils/seed.js) skips creation when a Super Admin
-> already exists — so the `.env` password was never applied. Its real password is unknown.
-> **Use `bestore@mail.com` / `Test@123` instead** (confirmed working), or reset
-> `superadmin@crm.local` via `server/resetUserPassword.js` (edit the target email).
+> ✅ **Every single account in the database uses the exact same password: `Password@123`.**
 
 ---
 
