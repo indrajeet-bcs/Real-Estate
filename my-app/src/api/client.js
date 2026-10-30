@@ -4,11 +4,17 @@ import axios from 'axios'
 // and attached per-request; the refresh token lives in an httpOnly cookie.
 const rawUrl = import.meta.env.VITE_API_URL || '/api'
 const baseURL = (rawUrl.startsWith('http') && !rawUrl.endsWith('/api') && !rawUrl.endsWith('/api/'))
-  ? `${rawUrl.replace(/\/+$/, '')}/api`
+  ? `${rawUrl.replace(/\\+$/, '')}/api`
   : rawUrl
 
 const api = axios.create({
+ preeti
   baseURL,
+
+  baseURL,               // use the computed baseURL (original logic)
+  // If you need the explicit fallback you had on the sub‑branch, you can use the line below instead:
+  // baseURL: import.meta.env.VITE_API_URL || '/api',
+ main
   withCredentials: true, // send the refresh cookie
 })
 
@@ -44,7 +50,8 @@ api.interceptors.response.use(
     const original = error.config
     const status = error.response?.status
 
-    const isAuthEndpoint = original?.url?.includes('/auth/login') || original?.url?.includes('/auth/refresh')
+    const isAuthEndpoint =
+      original?.url?.includes('/auth/login') || original?.url?.includes('/auth/refresh')
 
     if (status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true
