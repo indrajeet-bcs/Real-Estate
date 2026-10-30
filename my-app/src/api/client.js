@@ -8,11 +8,7 @@ const baseURL = (rawUrl.startsWith('http') && !rawUrl.endsWith('/api') && !rawUr
   : rawUrl
 
 const api = axios.create({
-<<<<<<< HEAD
   baseURL,
-=======
-  baseURL: import.meta.env.VITE_API_URL || '/api',
->>>>>>> sub-branch
   withCredentials: true, // send the refresh cookie
 })
 
