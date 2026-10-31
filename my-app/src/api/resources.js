@@ -474,4 +474,7 @@ export const billingApi = {
   transactions: () => api.get('/billing/transactions'),
   settings: () => api.get('/billing/settings'),
   updateSettings: (body) => api.patch('/billing/settings', body),
+  downloadInvoice: (id) => api.get(`/billing/invoices/${id}/download`, { responseType: 'text' }),
+  emailInvoice: (id) => api.post(`/billing/invoices/${id}/email`),
+  retryPayment: (subscriptionId) => api.post(`/billing/subscriptions/${subscriptionId}/retry`),
 }
