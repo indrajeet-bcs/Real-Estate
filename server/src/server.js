@@ -22,6 +22,7 @@ async function start() {
       })
     }
 
+
     process.on('SIGINT', () => shutdown('SIGINT'))
     process.on('SIGTERM', () => shutdown('SIGTERM'))
   } catch (err) {
