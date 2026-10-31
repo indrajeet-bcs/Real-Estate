@@ -48,15 +48,56 @@ export const listVisits = asyncHandler(async (req, res) => {
 // POST /api/visits — create + visit reminder (§6/§9).
 export const createVisit = asyncHandler(async (req, res) => {
   const customer = await Customer.findOne({ _id: req.body.customer, ...firmScope(req.user) })
-  if (!customer) throw ApiError.notFound('Customer not found')
+  if (!customer) {
+    throw ApiError.notFound('Customer or lead was not found in your branch/firm.')
+  }
+  if (customer.status === 'lost') {
+    throw ApiError.badRequest(`Cannot schedule visit: Customer "${customer.name}" is marked as Lost. Please reactivate or update the lead status first.`)
+  }
+
+  const scheduledTime = new Date(req.body.scheduledAt)
+  if (isNaN(scheduledTime.getTime())) {
+    throw ApiError.badRequest('Invalid date and time provided for the site visit.')
+  }
+  if (scheduledTime.getTime() < Date.now() - 5 * 60 * 1000) {
+    throw ApiError.badRequest('Site visit cannot be scheduled in the past. Please select an upcoming date and time.')
+  }
+
+  // Check for overlapping visits for this customer (within 45 mins)
+  const windowStart = new Date(scheduledTime.getTime() - 45 * 60 * 1000)
+  const windowEnd = new Date(scheduledTime.getTime() + 45 * 60 * 1000)
+  const overlappingVisit = await SiteVisit.findOne({
+    firm: req.user.firm,
+    customer: customer._id,
+    status: { $in: [VISIT_STATUS.SCHEDULED, VISIT_STATUS.CONFIRMED, VISIT_STATUS.IN_PROGRESS] },
+    scheduledAt: { $gte: windowStart, $lte: windowEnd },
+  }).populate('project', 'name')
+
+  if (overlappingVisit) {
+    const timeStr = new Date(overlappingVisit.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const projName = overlappingVisit.project?.name || 'another site'
+    throw ApiError.conflict(
+      `Cannot schedule visit: "${customer.name}" already has an active visit scheduled at ${projName} around ${timeStr}. Please select a different time.`
+    )
+  }
+
+  let assignedTo = customer.assignedTo || req.user._id
+  if (req.body.assignedTo) {
+    const exec = await User.findOne({ _id: req.body.assignedTo, ...firmScope(req.user), status: 'active' })
+    if (!exec) {
+      throw ApiError.badRequest('The selected executive was not found or is inactive.')
+    }
+    assignedTo = exec._id
+  }
+
   if (req.user.role === ROLES.SALES_EXECUTIVE && String(customer.assignedTo) !== String(req.user._id)) {
-    throw ApiError.forbidden('Customer is not assigned to you')
+    throw ApiError.forbidden(`Cannot schedule visit: Customer "${customer.name}" is assigned to another sales executive.`)
   }
 
   const visit = await SiteVisit.create({
     ...req.body,
     firm: req.user.firm,
-    assignedTo: customer.assignedTo || req.user._id,
+    assignedTo,
     createdBy: req.user._id,
     timeline: [{ type: 'scheduled', note: 'Visit scheduled' }],
   })

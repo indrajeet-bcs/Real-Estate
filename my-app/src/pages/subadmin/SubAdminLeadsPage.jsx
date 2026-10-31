@@ -219,10 +219,36 @@ function DecideTransferModal({ request, execs, onClose, onDone }) {
 function AddLeadModal({ execs, onClose, onDone }) {
   const toast = useToast()
   const [form, setForm] = useState({ name: '', mobile: '', email: '', budgetMax: '', source: 'walk_in', priority: 'medium', assignedTo: '' })
+  const [touched, setTouched] = useState({ mobile: false })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  const handleMobileChange = (e) => {
+    let val = e.target.value.replace(/\D/g, '')
+    if (val.length === 12 && val.startsWith('91')) {
+      val = val.slice(2)
+    } else if (val.length === 11 && val.startsWith('0')) {
+      val = val.slice(1)
+    }
+    val = val.slice(0, 10)
+    setForm((f) => ({ ...f, mobile: val }))
+  }
+
+  const isMobileValid = /^[6-9]\d{9}$/.test(form.mobile)
+  const mobileError = (() => {
+    if (!touched.mobile && !form.mobile) return ''
+    if (!form.mobile) return 'Mobile number is required'
+    if (form.mobile.length < 10) return `Mobile number must be exactly 10 digits (${form.mobile.length}/10)`
+    if (!/^[6-9]/.test(form.mobile)) return 'Mobile number must start with 6, 7, 8, or 9'
+    return ''
+  })()
+
   async function save() {
+    setTouched({ mobile: true })
+    if (!isMobileValid) {
+      toast.error('Please enter a valid 10-digit mobile number starting with 6-9')
+      return
+    }
     setBusy(true)
     try {
       await customersApi.create({
@@ -239,10 +265,24 @@ function AddLeadModal({ execs, onClose, onDone }) {
   }
 
   return (
-    <Modal open onClose={onClose} wide title="Add Lead" footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy || form.name.trim().length < 2 || form.mobile.trim().length < 7}>Create Lead</Button></>}>
+    <Modal open onClose={onClose} wide title="Add Lead" footer={
+      <>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={save} disabled={busy || form.name.trim().length < 2 || !isMobileValid}>Create Lead</Button>
+      </>
+    }>
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Customer Name" value={form.name} onChange={set('name')} />
-        <Input label="Mobile Number" value={form.mobile} onChange={set('mobile')} />
+        <Input
+          label="Mobile Number"
+          type="tel"
+          placeholder="10-digit mobile number"
+          maxLength={10}
+          value={form.mobile}
+          onChange={handleMobileChange}
+          onBlur={() => setTouched((t) => ({ ...t, mobile: true }))}
+          error={mobileError}
+        />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} />
         <Input label="Budget (max ₹)" type="number" value={form.budgetMax} onChange={set('budgetMax')} />
         <Select label="Lead Source" value={form.source} onChange={set('source')}>

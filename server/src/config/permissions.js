@@ -32,7 +32,7 @@ export const ROLE_PERMISSIONS = {
     [MODULES.CUSTOMER]: ['view', 'edit'], // Phase 4 ✅ (KYC, ownership)
     [MODULES.LEAD]: ['view', 'create', 'assign'], // Phase 4 ✅
     [MODULES.FOLLOWUP]: ['view'],
-    [MODULES.VISIT]: ['view'],
+    [MODULES.VISIT]: ['view', 'create', 'edit'],
     [MODULES.BOOKING]: ['view', 'create', 'edit'], // Phase 5 ✅
     [MODULES.COMMISSION]: ['view', 'create', 'edit', 'delete'], // Phase 6 ✅
     [MODULES.LEAVE]: ['view', 'approve'], // Branch-admin port: oversight
@@ -57,7 +57,7 @@ export const ROLE_PERMISSIONS = {
     [MODULES.LEAD]: ['view', 'create', 'edit', 'assign', 'import'],
     [MODULES.CUSTOMER]: ['view', 'edit'], // manage customer info + change owner (spec)
     [MODULES.FOLLOWUP]: ['view', 'create', 'edit'], // manage/assign branch follow-ups (spec)
-    [MODULES.VISIT]: ['view', 'edit'], // oversight, flag missed
+    [MODULES.VISIT]: ['view', 'create', 'edit'], // schedule, oversight, flag missed
     [MODULES.BOOKING]: ['view', 'edit'], // Branch-admin port: verify/confirm bookings
     [MODULES.LEAVE]: ['view', 'approve'], // Branch-admin port: approve team leave
     [MODULES.ATTENDANCE]: ['view'],

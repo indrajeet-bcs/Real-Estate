@@ -181,30 +181,147 @@ function ScheduleModal({ execs, onClose, onDone }) {
   const toast = useToast()
   const { data: customers } = useFetch(useCallback(() => customersApi.list({ limit: 200 }), []))
   const { data: projects } = useFetch(useCallback(() => projectsApi.list({ limit: 200 }), []))
-  const [form, setForm] = useState({ customer: '', project: '', scheduledAt: '' })
+  const [form, setForm] = useState({ customer: '', project: '', scheduledAt: '', assignedTo: '', meetingPoint: '', notes: '' })
+  const [errorMsg, setErrorMsg] = useState('')
   const [busy, setBusy] = useState(false)
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  async function save() {
-    setBusy(true)
-    try { await visitsApi.create(form); toast.success('Visit scheduled'); onDone() }
-    catch (err) { toast.error(err.response?.data?.message || 'Failed') }
-    finally { setBusy(false) }
+  const set = (k) => (e) => {
+    setErrorMsg('')
+    setForm((f) => ({ ...f, [k]: e.target.value }))
   }
 
+  const handleCustomerChange = (e) => {
+    const custId = e.target.value
+    setErrorMsg('')
+    const found = (customers || []).find((c) => c._id === custId)
+    setForm((f) => ({
+      ...f,
+      customer: custId,
+      assignedTo: found?.assignedTo?._id || found?.assignedTo || f.assignedTo,
+    }))
+  }
+
+  const isPast = form.scheduledAt && new Date(form.scheduledAt) < new Date(Date.now() - 5 * 60 * 1000)
+  const isComplete = form.customer && form.project && form.scheduledAt && !isPast
+
+  function validateBeforeSubmit() {
+    if (!form.customer) return 'Please select a customer or lead.'
+    if (!form.project) return 'Please select a project for the site visit.'
+    if (!form.scheduledAt) return 'Please choose a scheduled date and time.'
+    if (new Date(form.scheduledAt) < new Date(Date.now() - 5 * 60 * 1000)) {
+      return 'Site visit cannot be scheduled in the past. Please select an upcoming date and time.'
+    }
+    return null
+  }
+
+  async function save() {
+    const valErr = validateBeforeSubmit()
+    if (valErr) {
+      setErrorMsg(valErr)
+      toast.error(valErr)
+      return
+    }
+    setBusy(true)
+    setErrorMsg('')
+    try {
+      const payload = {
+        customer: form.customer,
+        project: form.project,
+        scheduledAt: form.scheduledAt,
+        assignedTo: form.assignedTo || undefined,
+        meetingPoint: form.meetingPoint || undefined,
+        notes: form.notes || undefined,
+      }
+      await visitsApi.create(payload)
+      toast.success('Site visit scheduled successfully')
+      onDone()
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Unable to schedule site visit'
+      setErrorMsg(msg)
+      toast.error(msg)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Min date-time string in local timezone (YYYY-MM-DDTHH:MM)
+  const minDateTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+
   return (
-    <Modal open onClose={onClose} title="Schedule Site Visit" footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy || !form.customer || !form.project || !form.scheduledAt}>Schedule</Button></>}>
-      <div className="space-y-4">
-        <Select label="Customer" value={form.customer} onChange={set('customer')}>
-          <option value="">Select…</option>
-          {(customers || []).map((c) => <option key={c._id} value={c._id}>{c.name} · {c.mobile}</option>)}
+    <Modal
+      open
+      onClose={onClose}
+      wide
+      title="Schedule Site Visit"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={busy || !isComplete}>
+            {busy ? 'Scheduling…' : 'Schedule Visit'}
+          </Button>
+        </>
+      }
+    >
+      {errorMsg && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <span className="font-semibold shrink-0">Cannot schedule visit:</span>
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Select label="Customer / Lead *" value={form.customer} onChange={handleCustomerChange}>
+          <option value="">Select customer or lead…</option>
+          {(customers || []).map((c) => (
+            <option key={c._id} value={c._id}>
+              {c.name} · {c.mobile} {c.status ? `(${titleCase(c.status)})` : ''}
+            </option>
+          ))}
         </Select>
-        <Select label="Project" value={form.project} onChange={set('project')}>
-          <option value="">Select…</option>
-          {(projects || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+
+        <Select label="Project *" value={form.project} onChange={set('project')}>
+          <option value="">Select project…</option>
+          {(projects || []).map((p) => (
+            <option key={p._id} value={p._id}>{p.name}</option>
+          ))}
         </Select>
-        <Input label="Date & Time" type="datetime-local" value={form.scheduledAt} onChange={set('scheduledAt')} />
+
+        <div>
+          <Input
+            label="Date & Time *"
+            type="datetime-local"
+            min={minDateTime}
+            value={form.scheduledAt}
+            onChange={set('scheduledAt')}
+            error={isPast ? 'Site visit cannot be scheduled in the past' : undefined}
+          />
+        </div>
+
+        <Select label="Assigned Executive (optional)" value={form.assignedTo} onChange={set('assignedTo')}>
+          <option value="">Customer’s assigned executive</option>
+          {(execs || []).map((x) => (
+            <option key={x._id} value={x._id}>{x.name}</option>
+          ))}
+        </Select>
+
+        <Input
+          label="Meeting Location (optional)"
+          placeholder="e.g. Sales Office Gate 1"
+          value={form.meetingPoint}
+          onChange={set('meetingPoint')}
+        />
+
+        <Input
+          label="Notes (optional)"
+          placeholder="e.g. Interested in 2BHK East facing"
+          value={form.notes}
+          onChange={set('notes')}
+        />
       </div>
+
+      <p className="mt-3 text-xs text-slate-500">
+        Site visits notify the assigned sales executive and update the lead timeline automatically.
+      </p>
     </Modal>
   )
 }
