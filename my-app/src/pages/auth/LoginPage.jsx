@@ -26,8 +26,22 @@ export default function LoginPage() {
       toast.success('Login successfully')
       const dest = location.state?.from?.pathname || ROLE_HOME[loggedIn.role] || '/'
       navigate(dest, { replace: true })
-    } catch {
-      toast.error('Invalid credentials')
+    } catch (err) {
+      if (err.response) {
+        if (err.response.status === 401) {
+          toast.error(err.response.data?.message || 'Invalid email or password')
+        } else if (err.response.status === 403) {
+          toast.error(err.response.data?.message || 'Account is inactive. Please contact your admin.')
+        } else if (err.response.status >= 500) {
+          toast.error('Server error. Please try again later.')
+        } else {
+          toast.error(err.response.data?.message || 'Login failed')
+        }
+      } else if (err.request) {
+        toast.error('Network or CORS error. Could not connect to backend server.')
+      } else {
+        toast.error(err.message || 'Login failed. Please try again.')
+      }
     } finally {
       setSubmitting(false)
     }
