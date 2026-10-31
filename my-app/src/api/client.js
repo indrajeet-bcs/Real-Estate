@@ -1,17 +1,18 @@
 import axios from 'axios'
 
-// Central axios instance. Access token is held in memory (set by AuthContext)
-// and attached per-request; the refresh token lives in an httpOnly cookie.
+// Get backend URL from Render environment variable
 const rawUrl = import.meta.env.VITE_API_URL || '/api'
-const baseURL = (rawUrl.startsWith('http') && !rawUrl.endsWith('/api') && !rawUrl.endsWith('/api/'))
-  ? `${rawUrl.replace(/\\+$/, '')}/api`
-  : rawUrl
+
+const baseURL =
+  rawUrl.startsWith('http') &&
+    !rawUrl.endsWith('/api') &&
+    !rawUrl.endsWith('/api/')
+    ? `${rawUrl.replace(/\/+$/, '')}/api`
+    : rawUrl
 
 const api = axios.create({
-  baseURL,               // use the computed baseURL (original logic)
-  // If you need the explicit fallback you had on the sub‑branch, you can use the line below instead:
-  // baseURL: import.meta.env.VITE_API_URL || '/api',
-  withCredentials: true, // send the refresh cookie
+  baseURL,
+  withCredentials: true,
 })
 
 let accessToken = null
