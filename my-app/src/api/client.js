@@ -8,13 +8,7 @@ const baseURL = (rawUrl.startsWith('http') && !rawUrl.endsWith('/api') && !rawUr
   : rawUrl
 
 const api = axios.create({
- preeti
   baseURL,
-
-  baseURL,               // use the computed baseURL (original logic)
-  // If you need the explicit fallback you had on the sub‑branch, you can use the line below instead:
-  // baseURL: import.meta.env.VITE_API_URL || '/api',
- main
   withCredentials: true, // send the refresh cookie
 })
 
