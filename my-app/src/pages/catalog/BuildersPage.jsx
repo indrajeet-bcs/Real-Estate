@@ -15,7 +15,8 @@ export default function BuildersPage({ readOnly = false }) {
   const [showCreate, setShowCreate] = useState(false)
 
   const { data, meta, loading, error, refetch } = useFetch(
-    useCallback(() => buildersApi.list({ page, limit }), [page, limit])
+    useCallback(() => buildersApi.list({ page, limit }), [page, limit]),
+    { autoRefresh: false }  // disable background polling so inFlight guard never blocks manual page navigation
   )
 
   async function archive(id) {
