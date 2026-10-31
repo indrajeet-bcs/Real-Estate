@@ -6,6 +6,7 @@ async function start() {
   try {
     // eslint-disable-next-line no-console
     console.log('[server] Initializing database connection...')
+
     await connectDB()
 
     const server = app.listen(env.port, () => {
