@@ -9,11 +9,11 @@ export function ToastProvider({ children }) {
     success: (message, options = {}) =>
       reactToastifyToast.success(message, {
         position: 'top-center',
-        autoClose: 3000,
-        hideProgressBar: false,
+        autoClose: 1500,
+        hideProgressBar: true,
         closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
+        pauseOnHover: false,
+        draggable: false,
         theme: 'colored',
         transition: Slide,
         ...options,
@@ -21,11 +21,11 @@ export function ToastProvider({ children }) {
     error: (message, options = {}) =>
       reactToastifyToast.error(message, {
         position: 'top-center',
-        autoClose: 4000,
-        hideProgressBar: false,
+        autoClose: 2500,
+        hideProgressBar: true,
         closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
+        pauseOnHover: false,
+        draggable: false,
         theme: 'colored',
         transition: Slide,
         ...options,
@@ -33,11 +33,11 @@ export function ToastProvider({ children }) {
     info: (message, options = {}) =>
       reactToastifyToast.info(message, {
         position: 'top-center',
-        autoClose: 3000,
-        hideProgressBar: false,
+        autoClose: 1500,
+        hideProgressBar: true,
         closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
+        pauseOnHover: false,
+        draggable: false,
         theme: 'colored',
         transition: Slide,
         ...options,
@@ -45,11 +45,11 @@ export function ToastProvider({ children }) {
     warning: (message, options = {}) =>
       reactToastifyToast.warning(message, {
         position: 'top-center',
-        autoClose: 3500,
-        hideProgressBar: false,
+        autoClose: 2000,
+        hideProgressBar: true,
         closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
+        pauseOnHover: false,
+        draggable: false,
         theme: 'colored',
         transition: Slide,
         ...options,
@@ -61,14 +61,14 @@ export function ToastProvider({ children }) {
       {children}
       <ToastContainer
         position="top-center"
-        autoClose={3000}
-        hideProgressBar={false}
+        autoClose={1500}
+        hideProgressBar={true}
         newestOnTop
         closeOnClick
         rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
+        pauseOnFocusLoss={false}
+        draggable={false}
+        pauseOnHover={false}
         theme="colored"
         transition={Slide}
         toastClassName="!rounded-xl !font-semibold !text-sm !shadow-xl"

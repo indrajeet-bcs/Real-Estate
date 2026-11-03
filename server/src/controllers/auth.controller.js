@@ -13,6 +13,7 @@ import { writeAudit } from '../middleware/audit.js'
 import { AUDIT_ACTIONS } from '../config/constants.js'
 import { effectivePermissions } from '../config/permissions.js'
 import { env, isProd } from '../config/env.js'
+import { sendOtpEmail } from '../utils/email.js'
 
 const REFRESH_COOKIE = 'refreshToken'
 
@@ -190,8 +191,7 @@ export const logoutAllDevices = asyncHandler(async (req, res) => {
   return ok(res, null, 'Signed out of all devices. Please log in again.')
 })
 
-// POST /api/auth/forgot-password — generates an OTP.
-// (Email/SMS delivery is stubbed; in dev the OTP is returned for testing.)
+// POST /api/auth/forgot-password — generates an OTP and emails it to the user.
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body
   const user = await User.findOne({ email }).select('+resetOtpHash +resetOtpExpires')
@@ -205,7 +205,13 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 min
   await user.save()
 
-  // TODO: send OTP via email/SMS provider. Dev convenience below.
+  // Send real OTP email to the registered address
+  await sendOtpEmail({
+    to: user.email,
+    name: user.name,
+    otp,
+  })
+
   const devOtp = isProd ? undefined : otp
   return ok(res, { devOtp }, 'If the account exists, an OTP has been sent')
 })

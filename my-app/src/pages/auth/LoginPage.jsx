@@ -24,7 +24,7 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       const loggedIn = await login(email, password)
-      toast.success('Login successfully')
+      toast.success('Login successful')
       const dest = location.state?.from?.pathname || ROLE_HOME[loggedIn.role] || '/'
       navigate(dest, { replace: true })
     } catch (err) {
