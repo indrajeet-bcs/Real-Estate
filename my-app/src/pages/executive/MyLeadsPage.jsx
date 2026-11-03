@@ -51,6 +51,26 @@ export default function MyLeadsPage() {
   const [dateRange, setDateRange] = useState('all')
   const [sort, setSort] = useState('recently_assigned')
 
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+    status !== 'all' ||
+    source !== 'all' ||
+    project !== 'all' ||
+    priority !== 'all' ||
+    dateRange !== 'all' ||
+    sort !== 'recently_assigned'
+  )
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatus('all')
+    setSource('all')
+    setProject('all')
+    setPriority('all')
+    setDateRange('all')
+    setSort('recently_assigned')
+  }
+
   // modal targets
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -233,6 +253,21 @@ export default function MyLeadsPage() {
             <option value="name">Name (A–Z)</option>
           </Select>
         </div>
+        {hasActiveFilters && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <span className="text-xs text-slate-500">
+              Showing <span className="font-semibold text-slate-800">{filtered.length}</span> of {rows.length} leads (filters active)
+            </span>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+              Clear Filters
+            </button>
+          </div>
+        )}
       </Card>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (
@@ -517,8 +552,15 @@ export function ScheduleVisitModal({ lead, projects, onClose, onDone }) {
   const [scheduledAt, setScheduledAt] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const now = new Date()
+  const minDateTimeLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+
   async function save() {
     if (!projectId || !scheduledAt) { toast.error('Select project, date & time'); return }
+    if (new Date(scheduledAt).getTime() < Date.now() - 5 * 60 * 1000) {
+      toast.error('Visit date & time cannot be in the past. Please select an upcoming date and time.')
+      return
+    }
     setBusy(true)
     try {
       await visitsApi.create({ customer: lead._id, project: projectId, scheduledAt })
@@ -538,7 +580,7 @@ export function ScheduleVisitModal({ lead, projects, onClose, onDone }) {
           <option value="">Select…</option>
           {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
         </Select>
-        <Input label="Date & time" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+        <Input label="Date & time" type="datetime-local" min={minDateTimeLocal} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
       </div>
     </Modal>
   )

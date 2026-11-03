@@ -32,6 +32,24 @@ export default function MyTasksPage() {
   const [dueRange, setDueRange] = useState('all')
   const [sort, setSort] = useState('recently_assigned')
 
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+    status !== 'all' ||
+    priority !== 'all' ||
+    assignedBy !== 'all' ||
+    dueRange !== 'all' ||
+    sort !== 'recently_assigned'
+  )
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatus('all')
+    setPriority('all')
+    setAssignedBy('all')
+    setDueRange('all')
+    setSort('recently_assigned')
+  }
+
   const [progressFor, setProgressFor] = useState(null)
   const [completeFor, setCompleteFor] = useState(null)
   const [detailsFor, setDetailsFor] = useState(null)
@@ -132,6 +150,21 @@ export default function MyTasksPage() {
             <option value="high_priority">High Priority</option>
           </Select>
         </div>
+        {hasActiveFilters && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <span className="text-xs text-slate-500">
+              Showing <span className="font-semibold text-slate-800">{filtered.length}</span> of {rows.length} tasks (filters active)
+            </span>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+              Clear Filters
+            </button>
+          </div>
+        )}
       </Card>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (

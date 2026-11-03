@@ -27,9 +27,21 @@ export default function BuildersDirectoryPage() {
     <div>
       <PageHeader title="Builders Directory" subtitle="Browse the firm's builders, RERA certification and their projects." />
 
-      <Card className="mb-4 p-3">
-        <div className="max-w-sm">
-          <Input placeholder="Search builder, city or RERA cert…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Card className="mb-4 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="w-full max-w-sm">
+            <Input placeholder="Search builder, city or RERA cert…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          {search.trim() && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+              Clear Filter
+            </button>
+          )}
         </div>
       </Card>
 

@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader, Table, Pagination, ExportMenu, Button, Input, Select, StatusBadge, Loader, ErrorState } from '../../components/ui.jsx'
 import { REGISTRATION_STATUSES, REGISTRATION_TYPES } from '../../lib/registrationConstants.js'
+import NewRegistrationModal from './NewRegistrationModal.jsx'
 import { registrationsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
@@ -9,6 +10,7 @@ import { formatDate, exportRowsToCsv } from '../../lib/format.js'
 
 export default function RegistrationCasesList() {
   const navigate = useNavigate()
+  const [showNewModal, setShowNewModal] = useState(false)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
@@ -49,11 +51,20 @@ export default function RegistrationCasesList() {
           actions={
             <>
               <ExportMenu items={[{ key: 'csv', label: 'Export to CSV', onClick: handleExport }]} disabled={rows.length === 0} />
-              <Button variant="primary" onClick={() => navigate('../create', { relative: 'path' })}>+ New Registration Case</Button>
+              <Button variant="primary" onClick={() => setShowNewModal(true)}>+ New Registration Case</Button>
             </>
           }
         />
       </div>
+
+      <NewRegistrationModal
+        open={showNewModal}
+        onClose={() => setShowNewModal(false)}
+        onDone={() => {
+          setShowNewModal(false)
+          refetch()
+        }}
+      />
 
       <div className="mb-6 flex flex-wrap items-end gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="min-w-[200px] flex-1"><Input label="Search" placeholder="Case, customer, booking, project…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} /></div>

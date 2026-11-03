@@ -1,3 +1,4 @@
+import UserRegistrationModal from '../../components/users/UserRegistrationModal.jsx'
 import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usersApi, customersApi, followupsApi, visitsApi, attendanceApi } from '../../api/resources.js'

@@ -59,6 +59,26 @@ export default function MyVisitsPage() {
   const [dateRange, setDateRange] = useState('all')
   const [sort, setSort] = useState('today')
 
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+    status !== 'all' ||
+    project !== 'all' ||
+    builder !== 'all' ||
+    visitType !== 'all' ||
+    dateRange !== 'all' ||
+    sort !== 'today'
+  )
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatus('all')
+    setProject('all')
+    setBuilder('all')
+    setVisitType('all')
+    setDateRange('all')
+    setSort('today')
+  }
+
   const [scheduling, setScheduling] = useState(false)
   const [editing, setEditing] = useState(null)
   const [checkInFor, setCheckInFor] = useState(null)
@@ -188,6 +208,21 @@ export default function MyVisitsPage() {
             <option value="recently_completed">Recently Completed</option>
           </Select>
         </div>
+        {hasActiveFilters && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <span className="text-xs text-slate-500">
+              Showing <span className="font-semibold text-slate-800">{filtered.length}</span> of {rows.length} visits (filters active)
+            </span>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+              Clear Filters
+            </button>
+          </div>
+        )}
       </Card>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (
@@ -294,9 +329,21 @@ function VisitFormModal({ visit, projects, builders, onClose, onDone }) {
     unitsApi.list({ project: form.project, limit: 200 }).then((res) => setUnits(res.data.data || [])).catch(() => setUnits([]))
   }, [form.project])
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const minSchedDate = todayStr
+
   async function save() {
     if (!form.date || !form.time || (!isEdit && !form.customer) || !form.project) {
       toast.error('Customer, project, date and time are required'); return
+    }
+    const scheduledTime = new Date(`${form.date}T${form.time}`).getTime()
+    if (isNaN(scheduledTime)) {
+      toast.error('Please enter a valid visit date and time')
+      return
+    }
+    if (scheduledTime < Date.now() - 5 * 60 * 1000) {
+      toast.error('Visit date & time cannot be in the past. Please select an upcoming date and time.')
+      return
     }
     setBusy(true)
     try {
@@ -348,7 +395,7 @@ function VisitFormModal({ visit, projects, builders, onClose, onDone }) {
           <option value="">{form.project ? 'None' : 'Pick a project first'}</option>
           {units.map((u) => <option key={u._id} value={u._id}>{u.unitNumber}</option>)}
         </Select>
-        <Input label="Visit Date *" type="date" value={form.date} onChange={set('date')} />
+        <Input label="Visit Date *" type="date" min={minSchedDate} value={form.date} onChange={set('date')} />
         <Input label="Visit Time *" type="time" value={form.time} onChange={set('time')} />
         <Select label="Visit Type" value={form.visitType} onChange={set('visitType')}>
           {VISIT_TYPES.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}
@@ -507,8 +554,26 @@ function RescheduleVisitModal({ visit, onClose, onDone }) {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
 
+  // Minimum selectable date: cannot be before today OR before existing visit date
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const existingDateStr = visit.scheduledAt ? new Date(visit.scheduledAt).toISOString().slice(0, 10) : ''
+  const minDate = existingDateStr && existingDateStr > todayStr ? existingDateStr : todayStr
+
   async function save() {
     if (!date || !time) { toast.error('Set new date & time'); return }
+    const newScheduledTime = new Date(`${date}T${time}`).getTime()
+    if (isNaN(newScheduledTime)) {
+      toast.error('Invalid date & time')
+      return
+    }
+    if (newScheduledTime < Date.now() - 5 * 60 * 1000) {
+      toast.error('Cannot select a past date or time. Please select an upcoming date and time.')
+      return
+    }
+    if (visit.scheduledAt && newScheduledTime <= new Date(visit.scheduledAt).getTime()) {
+      toast.error('Cannot select a previous visit date. You can only choose a future date & time after the existing visit schedule.')
+      return
+    }
     setBusy(true)
     try {
       await visitsApi.reschedule(visit._id, { scheduledAt: new Date(`${date}T${time}`).toISOString(), reason })
@@ -524,8 +589,16 @@ function RescheduleVisitModal({ visit, onClose, onDone }) {
       footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy}>Update Schedule</Button></>}
     >
       <div className="space-y-4">
+        {visit.scheduledAt && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-800">
+            <span className="font-semibold">Current Visit Schedule:</span>{' '}
+            {new Date(visit.scheduledAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}{' '}
+            at {new Date(visit.scheduledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}.
+            <p className="mt-0.5 text-amber-700">Rescheduled visit must be scheduled on or after this date & time.</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-4">
-          <Input label="New Date *" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input label="New Date *" type="date" min={minDate} value={date} onChange={(e) => setDate(e.target.value)} />
           <Input label="New Time *" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
         <div>

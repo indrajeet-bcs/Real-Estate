@@ -46,6 +46,32 @@ export default function MyInventoryPage() {
   const [budget, setBudget] = useState('all')
   const [sort, setSort] = useState('recent')
 
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+    builder !== 'all' ||
+    project !== 'all' ||
+    propertyType !== 'all' ||
+    configuration !== 'all' ||
+    tower !== 'all' ||
+    status !== 'all' ||
+    facing !== 'all' ||
+    budget !== 'all' ||
+    sort !== 'recent'
+  )
+
+  const clearFilters = () => {
+    setSearch('')
+    setBuilder('all')
+    setProject('all')
+    setPropertyType('all')
+    setConfiguration('all')
+    setTower('all')
+    setStatus('all')
+    setFacing('all')
+    setBudget('all')
+    setSort('recent')
+  }
+
   const [detailsFor, setDetailsFor] = useState(null)
   const [visitFor, setVisitFor] = useState(null)
   const [bookingFor, setBookingFor] = useState(null)
@@ -163,6 +189,21 @@ export default function MyInventoryPage() {
           <Select label="Budget" value={budget} onChange={(e) => setBudget(e.target.value)}><option value="all">All</option><option value="lt50">Below ₹50 L</option><option value="50to100">₹50 L – ₹1 Cr</option><option value="gt100">Above ₹1 Cr</option></Select>
           <Select label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)}><option value="recent">Recently Added</option><option value="price_asc">Price (Low to High)</option><option value="price_desc">Price (High to Low)</option><option value="area">Area</option></Select>
         </div>
+              {hasActiveFilters && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <span className="text-xs text-slate-500">
+              Showing <span className="font-semibold text-slate-800">{filtered.length}</span> of {units.length} units (filters active)
+            </span>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+              Clear Filters
+            </button>
+          </div>
+        )}
       </Card>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : view === 'table' ? (
@@ -281,8 +322,15 @@ function ScheduleVisitModal({ unit, onClose, onDone }) {
 
   useEffect(() => { customersApi.list({ limit: 500 }).then((r) => setCustomers(r.data.data || [])).catch(() => {}) }, [])
 
+  const now = new Date()
+  const minDateTimeLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+
   async function save() {
     if (!customer || !scheduledAt) { toast.error('Select a customer, date & time'); return }
+    if (new Date(scheduledAt).getTime() < Date.now() - 5 * 60 * 1000) {
+      toast.error('Visit date & time cannot be in the past. Please select an upcoming date and time.')
+      return
+    }
     setBusy(true)
     try {
       await visitsApi.create({ customer, project: projectId, unit: unit._id, scheduledAt })
@@ -300,7 +348,7 @@ function ScheduleVisitModal({ unit, onClose, onDone }) {
           <option value="">Select a customer…</option>
           {customers.map((c) => <option key={c._id} value={c._id}>{c.name} · {c.mobile}</option>)}
         </Select>
-        <Input label="Date & time" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+        <Input label="Date & time" type="datetime-local" min={minDateTimeLocal} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
         <p className="text-xs text-slate-500">The visit is linked to this unit's project.</p>
       </div>
     </Modal>
