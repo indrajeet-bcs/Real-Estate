@@ -13,20 +13,32 @@ import { writeAudit } from '../middleware/audit.js'
 import { AUDIT_ACTIONS } from '../config/constants.js'
 import { effectivePermissions } from '../config/permissions.js'
 import { env, isProd } from '../config/env.js'
+import { sendOtpEmail } from '../utils/email.js'
 
 const REFRESH_COOKIE = 'refreshToken'
+
+const isSecure = isProd || process.env.RENDER === 'true'
 
 function refreshCookieOptions() {
   return {
     httpOnly: true,
-    secure: isProd,
-    // 'none' is required for cross-origin requests (Vercel ↔ Render).
+    secure: isSecure,
+    // 'none' is required for cross-origin requests (e.g. Render frontend <-> Render backend).
     // Browsers reject SameSite=Strict/Lax on cross-site credentialed requests.
-    // 'none' is only sent over HTTPS (secure: true in prod guards this).
-    sameSite: isProd ? 'none' : 'lax',
+    // 'none' is only sent over HTTPS (secure: true guards this).
+    sameSite: isSecure ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
     path: '/api/auth',
   }
+}
+
+function clearRefreshCookie(res) {
+  res.clearCookie(REFRESH_COOKIE, {
+    path: '/api/auth',
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: isSecure ? 'none' : 'lax',
+  })
 }
 
 // Issues an access token (returned in body) and a refresh token (httpOnly
@@ -85,7 +97,8 @@ export const refresh = asyncHandler(async (req, res) => {
   if (!user || !user.isActive) throw ApiError.unauthorized('Session no longer valid')
 
   const tokenHash = hashToken(token)
-  if (!user.refreshTokens.includes(tokenHash)) {
+  const tokens = Array.isArray(user.refreshTokens) ? user.refreshTokens : []
+  if (!tokens.includes(tokenHash)) {
     // Token reuse / revoked — clear all sessions defensively (atomic).
     await User.updateOne({ _id: user._id }, { $set: { refreshTokens: [] } })
     throw ApiError.unauthorized('Session revoked, please log in again')
@@ -113,7 +126,7 @@ export const logout = asyncHandler(async (req, res) => {
       /* ignore — logging out with an invalid token is fine */
     }
   }
-  res.clearCookie(REFRESH_COOKIE, { path: '/api/auth' })
+  clearRefreshCookie(res)
   return ok(res, null, 'Logged out')
 })
 
@@ -174,12 +187,11 @@ export const uploadProfileDocument = asyncHandler(async (req, res) => {
 // POST /api/auth/logout-all — revoke every session (spec §Security).
 export const logoutAllDevices = asyncHandler(async (req, res) => {
   await User.updateOne({ _id: req.user._id }, { $set: { refreshTokens: [] } })
-  res.clearCookie(REFRESH_COOKIE, { path: '/api/auth' })
+  clearRefreshCookie(res)
   return ok(res, null, 'Signed out of all devices. Please log in again.')
 })
 
-// POST /api/auth/forgot-password — generates an OTP.
-// (Email/SMS delivery is stubbed; in dev the OTP is returned for testing.)
+// POST /api/auth/forgot-password — generates an OTP and emails it to the user.
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body
   const user = await User.findOne({ email }).select('+resetOtpHash +resetOtpExpires')
@@ -193,8 +205,15 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 min
   await user.save()
 
-  // TODO: send OTP via email/SMS provider. Dev convenience below.
-  const devOtp = isProd ? undefined : otp
+  // Send real OTP email to the registered address
+  const emailResult = await sendOtpEmail({
+    to: user.email,
+    name: user.name,
+    otp,
+  })
+
+  // Only show devOtp if real email was not sent (e.g. SMTP credentials missing in dev)
+  const devOtp = (!isProd && !emailResult?.sent) ? otp : undefined
   return ok(res, { devOtp }, 'If the account exists, an OTP has been sent')
 })
 
@@ -230,6 +249,6 @@ export const changePassword = asyncHandler(async (req, res) => {
   user.refreshTokens = []
   await user.save()
   writeAudit({ req, action: AUDIT_ACTIONS.UPDATE, module: 'user', targetId: user._id, targetLabel: user.name, description: 'Changed own password' })
-  res.clearCookie(REFRESH_COOKIE, { path: '/api/auth' })
+  clearRefreshCookie(res)
   return ok(res, null, 'Password changed. Please log in again.')
 })

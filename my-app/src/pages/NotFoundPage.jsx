@@ -4,7 +4,7 @@ import { ROLE_HOME } from '../lib/constants.js'
 
 export default function NotFoundPage() {
   const { user } = useAuth()
-  const home = user ? ROLE_HOME[user.role] || '/' : '/login'
+  const home = user ? ROLE_HOME[user.role] || '/' : '/'
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 text-center">
       <div className="text-6xl font-bold text-slate-300">404</div>

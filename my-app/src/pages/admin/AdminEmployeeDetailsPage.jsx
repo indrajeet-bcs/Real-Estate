@@ -1,9 +1,12 @@
-import { useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { usersApi } from '../../api/resources.js'
+import { usersApi, branchesApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
-import { PageHeader, Card, StatCard, Table, StatusBadge, Loader, ErrorState } from '../../components/ui.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { useToast } from '../../context/ToastContext.jsx'
+import { PageHeader, Card, StatCard, Table, StatusBadge, Button, Loader, ErrorState } from '../../components/ui.jsx'
 import { formatDate, titleCase } from '../../lib/format.js'
+import { EmployeeModal, TransferModal, DeleteEmployeeModal } from './AdminEmployeesPage.jsx'
 
 const inr = (n) => {
   const v = Number(n) || 0
@@ -33,7 +36,33 @@ function Field({ label, value }) {
 export default function AdminEmployeeDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { can } = useAuth()
+  const toast = useToast()
+
+  const [editing, setEditing] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   const { data, loading, error, refetch } = useFetch(useCallback(() => usersApi.get(id), [id]))
+  const { data: branches } = useFetch(useCallback(() => branchesApi.list(), []))
+  const { data: subAdmins } = useFetch(useCallback(() => usersApi.list({ role: 'sub_admin', limit: 100 }), []))
+  const { data: allStaff } = useFetch(useCallback(() => usersApi.list({ limit: 200 }), []))
+
+  async function toggleActive() {
+    if (!data?.user) return
+    try {
+      if (data.user.isActive) {
+        await usersApi.deactivate(data.user._id)
+        toast.success('Employee disabled')
+      } else {
+        await usersApi.activate(data.user._id)
+        toast.success('Employee activated')
+      }
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update employee status')
+    }
+  }
 
   if (loading) return <Loader />
   if (error) return <ErrorState message={error} onRetry={refetch} />
@@ -53,7 +82,34 @@ export default function AdminEmployeeDetailsPage() {
       <PageHeader
         title={user.name}
         subtitle={`${user.employeeId || '—'} · ${titleCase(user.role)} · ${user.branch || 'No branch'}`}
-        actions={<StatusBadge status={user.isActive ? 'approved' : 'cancelled'} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={user.isActive ? 'approved' : 'cancelled'} />
+            {can('user', 'edit') && (
+              <Button variant="secondary" onClick={() => setEditing(true)}>
+                Edit Details
+              </Button>
+            )}
+            {can('user', 'edit') && (
+              <Button variant="secondary" onClick={() => setTransferring(true)}>
+                Transfer
+              </Button>
+            )}
+            {can('user', 'edit') && (
+              <Button
+                variant="secondary"
+                onClick={toggleActive}
+              >
+                {user.isActive ? 'Disable' : 'Activate'}
+              </Button>
+            )}
+            {can('user', 'delete') && (
+              <Button variant="danger" onClick={() => setDeleting(true)}>
+                Delete Employee
+              </Button>
+            )}
+          </div>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -180,6 +236,44 @@ export default function AdminEmployeeDetailsPage() {
           </ol>
         </Section>
       </div>
+
+      {editing && (
+        <EmployeeModal
+          user={user}
+          branches={branches || []}
+          subAdmins={subAdmins || []}
+          onClose={() => setEditing(false)}
+          onDone={() => {
+            setEditing(false)
+            refetch()
+          }}
+        />
+      )}
+
+      {transferring && (
+        <TransferModal
+          user={user}
+          branches={branches || []}
+          subAdmins={subAdmins || []}
+          onClose={() => setTransferring(false)}
+          onDone={() => {
+            setTransferring(false)
+            refetch()
+          }}
+        />
+      )}
+
+      {deleting && (
+        <DeleteEmployeeModal
+          user={{ ...user, activeLeadsCount: leadSummary.activeLeads }}
+          otherStaff={(allStaff || []).filter((s) => s._id !== user._id && s.isActive)}
+          onClose={() => setDeleting(false)}
+          onDone={() => {
+            setDeleting(false)
+            navigate('/admin/employees')
+          }}
+        />
+      )}
     </div>
   )
 }

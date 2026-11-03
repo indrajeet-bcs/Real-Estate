@@ -270,8 +270,26 @@ export const updateUser = asyncHandler(async (req, res) => {
     throw ApiError.forbidden('Cannot manage a user at or above your role')
   }
 
-  const { permissions, ...rest } = req.body
+  if (req.body.role && ROLE_RANK[req.user.role] <= ROLE_RANK[req.body.role]) {
+    throw ApiError.forbidden('Cannot assign a role at or above your own')
+  }
+
+  if (req.body.email && req.body.email.toLowerCase() !== target.email) {
+    const exists = await User.findOne({ email: req.body.email.toLowerCase(), _id: { $ne: target._id } })
+    if (exists) throw ApiError.conflict('An account with that email already exists')
+    target.email = req.body.email.toLowerCase()
+  }
+
+  const { permissions, manager, password, ...rest } = req.body
   Object.assign(target, rest)
+  if (manager !== undefined) {
+    target.manager = manager || null
+  }
+  if (password && password.trim().length >= 8) {
+    target.password = password.trim()
+    target.passwordChangedAt = new Date()
+    target.refreshTokens = []
+  }
   if (permissions) target.permissions = permissions
   await target.save()
 
@@ -281,9 +299,66 @@ export const updateUser = asyncHandler(async (req, res) => {
     module: MODULES.USER,
     targetId: target._id,
     targetLabel: target.name,
-    description: `Updated ${target.email}`,
+    description: `Updated employee ${target.name} (${target.email})`,
   })
   return ok(res, target, 'User updated')
+})
+
+// DELETE /api/users/:id — permanently delete an employee (Admin only)
+export const deleteUser = asyncHandler(async (req, res) => {
+  const target = await User.findOne({ _id: req.params.id, ...firmScope(req.user) })
+  if (!target) throw ApiError.notFound('User not found')
+  if (ROLE_RANK[req.user.role] <= ROLE_RANK[target.role]) {
+    throw ApiError.forbidden('Cannot delete a user at or above your role')
+  }
+
+  const openStatuses = [CUSTOMER_STATUS.NEW, CUSTOMER_STATUS.IN_PROGRESS, CUSTOMER_STATUS.FOLLOW_UP_DUE]
+  const openCount = await Customer.countDocuments({
+    assignedTo: target._id,
+    status: { $in: openStatuses },
+  })
+
+  const { reassignTo } = req.body || {}
+  if (openCount > 0 && reassignTo) {
+    const newOwner = await User.findOne({ _id: reassignTo, ...firmScope(req.user), isActive: true })
+    if (!newOwner) throw ApiError.badRequest('Reassignment target is invalid or inactive')
+
+    await Customer.updateMany(
+      { assignedTo: target._id, status: { $in: openStatuses } },
+      { $set: { assignedTo: newOwner._id, assignedAt: new Date() } }
+    )
+    await FollowUp.updateMany(
+      { assignedTo: target._id, status: 'scheduled' },
+      { $set: { assignedTo: newOwner._id } }
+    )
+  } else if (openCount > 0) {
+    await Customer.updateMany(
+      { assignedTo: target._id, status: { $in: openStatuses } },
+      { $set: { assignedTo: null } }
+    )
+    await FollowUp.updateMany(
+      { assignedTo: target._id, status: 'scheduled' },
+      { $set: { assignedTo: null } }
+    )
+  }
+
+  await User.updateMany(
+    { manager: target._id, firm: req.user.firm },
+    { $unset: { manager: 1 } }
+  )
+
+  await target.deleteOne()
+
+  writeAudit({
+    req,
+    action: AUDIT_ACTIONS.DELETE,
+    module: MODULES.USER,
+    targetId: target._id,
+    targetLabel: target.name,
+    description: `Deleted ${target.role} ${target.name} (${target.email})`,
+  })
+
+  return ok(res, null, 'Employee deleted successfully')
 })
 
 // PATCH /api/users/:id/deactivate — mandatory reassignment if active leads (§15).
