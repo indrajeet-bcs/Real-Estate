@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { PageHeader, Input, Select, Loader, ErrorState } from '../../../components/ui.jsx'
 import { billingApi } from '../../../api/resources.js'
 import { useFetch } from '../../../hooks/useFetch.js'
+import { useToast } from '../../../context/ToastContext.jsx'
 
 const STATUS_CFG = {
   paid:      { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Paid' },
@@ -21,7 +22,44 @@ function fmtDate(s) {
 
 export default function BillingPage() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [search, setSearch] = useState('')
+  const [retrying, setRetrying] = useState({})
+
+  async function handleInvoiceDownload(r) {
+    if (!r.invoice || r.invoice === '—') {
+      toast.error('No invoice available for this record')
+      return
+    }
+    try {
+      // Use axios (authenticated) to fetch the HTML, then open as a blob in a new tab
+      const res = await billingApi.downloadInvoice(r.invoice)
+      const blob = new Blob([res.data], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      const win = window.open(url, '_blank')
+      if (!win) {
+        toast.error('Pop-up blocked — please allow pop-ups for this site.')
+      }
+      // Revoke blob URL after a short delay to free memory
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to download invoice')
+    }
+  }
+
+  async function handleRetry(r) {
+    if (retrying[r.id]) return
+    setRetrying((s) => ({ ...s, [r.id]: true }))
+    try {
+      const res = await billingApi.retryPayment(r.id)
+      toast.success(res.data?.data?.message || 'Retry initiated — invoice moved to Pending')
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Retry failed. Please try again.')
+    } finally {
+      setRetrying((s) => ({ ...s, [r.id]: false }))
+    }
+  }
   const [status, setStatus] = useState('all')
   const [plan, setPlan]     = useState('all')
 
@@ -125,12 +163,19 @@ export default function BillingPage() {
                         className="px-2 py-1 text-xs rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition font-medium">
                         View
                       </button>
-                      <button className="px-2 py-1 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 transition font-medium">
+                                            <button
+                        onClick={() => handleInvoiceDownload(r)}
+                        disabled={!r.invoice || r.invoice === '—'}
+                        title={r.invoice && r.invoice !== '—' ? 'Download ' + r.invoice : 'No invoice available'}
+                        className="px-2 py-1 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed">
                         ↓ Invoice
                       </button>
                       {r.status === 'failed' && (
-                        <button className="px-2 py-1 text-xs rounded border border-amber-200 text-amber-700 hover:bg-amber-50 transition font-medium">
-                          ↻ Retry
+                                                <button
+                          onClick={() => handleRetry(r)}
+                          disabled={!!retrying[r.id]}
+                          className="px-2 py-1 text-xs rounded border border-amber-200 text-amber-700 hover:bg-amber-50 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                          {retrying[r.id] ? 'Retrying...' : '↺ Retry'}
                         </button>
                       )}
                     </div>

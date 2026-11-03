@@ -9,9 +9,10 @@ async function start() {
 
     await connectDB()
 
-    const server = app.listen(env.port, () => {
+    // Explicitly bind to 0.0.0.0 so cloud environments like Render detect the open port immediately
+    const server = app.listen(env.port, '0.0.0.0', () => {
       // eslint-disable-next-line no-console
-      console.log(`[server] Real Estate CRM API running on http://localhost:${env.port} (${env.nodeEnv})`)
+      console.log(`[server] Real Estate CRM API running on port ${env.port} (${env.nodeEnv})`)
     })
 
     const shutdown = async (signal) => {
@@ -35,4 +36,3 @@ async function start() {
 }
 
 start()
-
