@@ -6,6 +6,7 @@ import DashboardLayout from './components/layout/DashboardLayout.jsx'
 import { ROLES } from './lib/constants.js'
 
 // Auth
+import LandingPage from './pages/landing/LandingPage.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
@@ -367,8 +368,8 @@ export default function App() {
               <Route path="pending-tasks" element={<PendingTasksPage />} />
             </Route>
 
-            {/* Default */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Public Landing & Default */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>
