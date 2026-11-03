@@ -150,8 +150,8 @@ function shell(role) {
 export default function App() {
   return (
     <ToastProvider>
-      <AuthProvider>
-        <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
           <Routes>
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
@@ -372,8 +372,8 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </ToastProvider>
   )
 }

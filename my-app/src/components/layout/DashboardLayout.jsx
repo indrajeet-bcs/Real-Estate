@@ -89,7 +89,7 @@ export default function DashboardLayout() {
   async function handleLogout() {
     await logout()
     toast.success('Logout successfully')
-    navigate('/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   return (

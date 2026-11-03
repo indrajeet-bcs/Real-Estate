@@ -51,7 +51,7 @@ export default function ExecutiveLayout() {
   async function handleLogout() {
     await logout()
     toast.success('Logout successfully')
-    navigate('/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   return (
