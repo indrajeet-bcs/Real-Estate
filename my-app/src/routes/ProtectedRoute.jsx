@@ -17,11 +17,11 @@ export default function ProtectedRoute({ children, roles }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/" replace />
   }
 
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to={ROLE_HOME[user.role] || '/login'} replace />
+    return <Navigate to={ROLE_HOME[user.role] || '/'} replace />
   }
 
   return children

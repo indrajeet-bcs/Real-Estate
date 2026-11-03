@@ -87,6 +87,7 @@ export default function DashboardLayout() {
   }
 
   async function handleLogout() {
+    setShowLogoutConfirm(false)
     await logout()
     toast.success('Logout successfully')
     navigate('/', { replace: true })
