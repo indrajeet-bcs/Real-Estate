@@ -54,6 +54,26 @@ export default function MyFollowUpsPage() {
   const [dateRange, setDateRange] = useState('all')
   const [sort, setSort] = useState('today')
 
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+    status !== 'all' ||
+    type !== 'all' ||
+    stage !== 'all' ||
+    project !== 'all' ||
+    dateRange !== 'all' ||
+    sort !== 'today'
+  )
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatus('all')
+    setType('all')
+    setStage('all')
+    setProject('all')
+    setDateRange('all')
+    setSort('today')
+  }
+
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(null)
   const [completeFor, setCompleteFor] = useState(null)
@@ -203,6 +223,21 @@ export default function MyFollowUpsPage() {
             <option value="recently_completed">Recently Completed</option>
           </Select>
         </div>
+        {hasActiveFilters && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <span className="text-xs text-slate-500">
+              Showing <span className="font-semibold text-slate-800">{filtered.length}</span> of {rows.length} follow-ups (filters active)
+            </span>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+              Clear Filters
+            </button>
+          </div>
+        )}
       </Card>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (

@@ -216,9 +216,10 @@ function NewLeadModal({ execs, onClose, onDone }) {
       </>
     }>
       <div className="space-y-4">
-        <Input label="Full name" value={form.name} onChange={set('name')} />
+        <Input label="Full name" required value={form.name} onChange={set('name')} />
         <Input
           label="Mobile"
+          required
           type="tel"
           placeholder="10-digit mobile number"
           maxLength={10}
@@ -227,7 +228,7 @@ function NewLeadModal({ execs, onClose, onDone }) {
           onBlur={() => setTouched((t) => ({ ...t, mobile: true }))}
           error={mobileError}
         />
-        <Select label="Source" value={form.source} onChange={set('source')}>
+        <Select label="Source" required value={form.source} onChange={set('source')}>
           {SOURCES.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}
         </Select>
         <Input label="Budget (max ₹)" type="number" value={form.budgetMax} onChange={set('budgetMax')} />

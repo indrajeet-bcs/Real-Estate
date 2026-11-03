@@ -118,28 +118,51 @@ export const ROLE_PERMISSIONS = {
 // Resolve the effective permissions for a user: per-user overrides (if any)
 // merged over role defaults.
 export function effectivePermissions(user) {
-  // When the user is assigned an active custom Role (populated), that role's
-  // permission map is AUTHORITATIVE — it fully defines fine-grained access, so an
-  // unmentioned/"none" module means no access (a custom role can restrict, not
-  // just extend). The enum `user.role` still governs hard requireRole() gates.
+  const base = ROLE_PERMISSIONS[user.role] || {}
   const cr = user.customRole
-  let result
+  let result = { ...base }
+
   if (cr && typeof cr === 'object' && cr.status === 'active' && cr.permissions && Object.keys(cr.permissions).length > 0) {
-    result = { ...cr.permissions }
-  } else {
-    result = { ...(ROLE_PERMISSIONS[user.role] || {}) }
+    // Merge custom role permissions over base role defaults
+    for (const [mod, actions] of Object.entries(cr.permissions)) {
+      if (Array.isArray(actions) && actions.length > 0) {
+        result[mod] = actions
+      }
+    }
   }
 
   // Per-user overrides (highest precedence).
   if (user.permissions && user.permissions.size > 0) {
     for (const [mod, actions] of user.permissions.entries()) result[mod] = actions
   }
+
+  // Core operational modules: Sub-Admin, Admin, and Sales Executive must always be able to schedule/manage visits
+  if ([ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE].includes(user.role)) {
+    if (!result[MODULES.VISIT] || !result[MODULES.VISIT].includes('create')) {
+      result[MODULES.VISIT] = Array.from(new Set([...(result[MODULES.VISIT] || ['view']), 'create', 'edit']))
+    }
+  }
+
   return result
 }
 
 export function can(user, module, action) {
+  if (!user) return false
+  if (user.role === ROLES.SUPER_ADMIN) return true
+
+  // Sub-Admins, Admins, and Sales Executives can always view, create, and edit visits
+  if ([ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE].includes(user.role) && module === MODULES.VISIT) {
+    if (['view', 'create', 'edit'].includes(action)) return true
+  }
+
   const perms = effectivePermissions(user)
   const allowed = perms[module]
-  if (!allowed) return false
+  if (!allowed) {
+    const fallback = ROLE_PERMISSIONS[user.role]?.[module]
+    if (fallback) {
+      return fallback.includes('*') || fallback.includes(action)
+    }
+    return false
+  }
   return allowed.includes('*') || allowed.includes(action)
 }

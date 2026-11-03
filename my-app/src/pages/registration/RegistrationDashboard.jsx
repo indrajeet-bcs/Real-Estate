@@ -1,13 +1,51 @@
-import { useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import NewRegistrationModal from './NewRegistrationModal.jsx'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader, Card, StatCard, Button, Loader, ErrorState } from '../../components/ui.jsx'
 import { registrationsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
-import { formatDate } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv } from '../../lib/format.js'
+import { useToast } from '../../context/ToastContext.jsx'
 
 export default function RegistrationDashboard() {
   const navigate = useNavigate()
+  const [showNewModal, setShowNewModal] = useState(false)
   const { data, loading, error, refetch } = useFetch(useCallback(() => registrationsApi.dashboard(), []))
+  const toast = useToast()
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadCsv = async () => {
+    setDownloading(true)
+    try {
+      const res = await registrationsApi.list({ limit: 1000 })
+      const list = res.data?.data || res.data || []
+      if (!list.length) {
+        toast.info('No registration cases available to download')
+        return
+      }
+      exportRowsToCsv('registration-cases-report.csv', list.map((c) => ({
+        'Case Code': c.caseCode || '—',
+        'Customer': c.customerName || '—',
+        'Booking': c.bookingLabel || '—',
+        'Project': c.project || '—',
+        'Unit': c.unitNumber || '—',
+        'Branch': c.branch || '—',
+        'Type': c.registrationType || '—',
+        'Authority': c.registrationAuthority || '—',
+        'Status': c.status || '—',
+        'Expected Date': formatDate(c.expectedRegistrationDate),
+        'Appointment Date': formatDate(c.appointmentDate),
+        'Assigned Employee': c.assignedEmployee?.name || c.assignedEmployeeName || '—',
+        'Remarks': c.remarks || '—'
+      })))
+      toast.success('Registration report downloaded successfully (CSV)')
+    } catch {
+      toast.error('Failed to download registration report')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   const d = data || {}
   const recent = d.recent || []
 
@@ -18,10 +56,23 @@ export default function RegistrationDashboard() {
         subtitle="Track property registrations from document collection to possession readiness."
         actions={
           <>
+            <Button variant="secondary" onClick={handleDownloadCsv} disabled={downloading}>
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>{downloading ? 'Downloading CSV…' : 'Download CSV Report'}</span>
+            </Button>
             <Button variant="secondary" onClick={() => navigate('reports')}>View Reports</Button>
-            <Button variant="primary" onClick={() => navigate('create')}>+ New Registration Case</Button>
+            <Button variant="primary" onClick={() => setShowNewModal(true)}>+ New Registration Case</Button>
           </>
         }
+      />
+
+      <NewRegistrationModal
+        open={showNewModal}
+        onClose={() => setShowNewModal(false)}
+        onDone={() => {
+          setShowNewModal(false)
+          refetch()
+        }}
       />
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (

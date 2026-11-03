@@ -2,13 +2,48 @@ import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader, Card, Button, ExportMenu, Loader, ErrorState } from '../../components/ui.jsx'
 import { possessionsApi } from '../../api/resources.js'
+import { useState } from 'react'
 import { useFetch } from '../../hooks/useFetch.js'
+import { useToast } from '../../context/ToastContext.jsx'
+import { formatDate } from '../../lib/format.js'
 import { exportRowsToCsv } from '../../lib/format.js'
 
 export default function PossessionReports() {
   const navigate = useNavigate()
   const { data, loading, error, refetch } = useFetch(useCallback(() => possessionsApi.reports(), []))
   const r = data || { byStatus: [], byEmployee: [], byProject: [] }
+  const toast = useToast()
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadMasterCsv = async () => {
+    setDownloading(true)
+    try {
+      const res = await possessionsApi.list({ limit: 1000 })
+      const list = res.data?.data || res.data || []
+      if (!list.length) {
+        toast.info('No possession cases available')
+        return
+      }
+      exportRowsToCsv('possession-master-report.csv', list.map((c) => ({
+        'Case Code': c.caseCode || '—',
+        'Customer': c.customerName || '—',
+        'Booking': c.bookingLabel || '—',
+        'Project': c.project || '—',
+        'Unit': c.unitNumber || '—',
+        'Status': c.status || '—',
+        'Key Handover Date': formatDate(c.keyHandoverDate),
+        'Actual Possession Date': formatDate(c.actualPossessionDate),
+        'Assigned Employee': c.assignedEmployee?.name || c.assignedEmployeeName || '—',
+        'Remarks': c.remarks || '—'
+      })))
+      toast.success('Master possession report downloaded successfully (CSV)')
+    } catch {
+      toast.error('Failed to download master possession report')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
 
   const exportStatus = () => exportRowsToCsv('possession-status.csv', r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases })))
   const exportEmp = () => exportRowsToCsv('possession-employee.csv', r.byEmployee.map((x) => ({ Employee: x._id || '—', Cases: x.cases, Completed: x.completed || 0 })))
@@ -18,7 +53,16 @@ export default function PossessionReports() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-3 mb-2">← Back to Dashboard</Button>
-        <PageHeader title="Possession Reports" subtitle="Live insights across all handover cases." />
+        <PageHeader
+          title="Possession Reports"
+          subtitle="Live insights across all handover cases."
+          actions={
+            <Button variant="primary" onClick={handleDownloadMasterCsv} disabled={downloading}>
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>{downloading ? 'Downloading CSV…' : 'Download CSV Report'}</span>
+            </Button>
+          }
+        />
       </div>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (

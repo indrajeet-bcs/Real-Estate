@@ -83,7 +83,7 @@ export const createVisit = asyncHandler(async (req, res) => {
 
   let assignedTo = customer.assignedTo || req.user._id
   if (req.body.assignedTo) {
-    const exec = await User.findOne({ _id: req.body.assignedTo, ...firmScope(req.user), status: 'active' })
+    const exec = await User.findOne({ _id: req.body.assignedTo, ...firmScope(req.user), isActive: { $ne: false } })
     if (!exec) {
       throw ApiError.badRequest('The selected executive was not found or is inactive.')
     }
@@ -135,6 +135,15 @@ export const updateVisit = asyncHandler(async (req, res) => {
   if ([VISIT_STATUS.CONDUCTED, VISIT_STATUS.CANCELLED].includes(visit.status)) {
     throw ApiError.badRequest('Completed or cancelled visits cannot be edited')
   }
+  if (req.body.scheduledAt) {
+    const newScheduledTime = new Date(req.body.scheduledAt).getTime()
+    if (isNaN(newScheduledTime)) {
+      throw ApiError.badRequest('Invalid visit date and time')
+    }
+    if (newScheduledTime < Date.now() - 5 * 60 * 1000) {
+      throw ApiError.badRequest('Site visit cannot be scheduled in the past. Please select an upcoming date and time.')
+    }
+  }
   const allowed = ['project', 'builder', 'unit', 'scheduledAt', 'visitType', 'meetingPoint', 'notes']
   for (const k of allowed) if (req.body[k] !== undefined) visit[k] = req.body[k]
   visit.timeline.push({ type: 'updated', note: 'Visit details updated' })
@@ -146,6 +155,16 @@ export const updateVisit = asyncHandler(async (req, res) => {
 // PATCH /api/visits/:id/reschedule
 export const rescheduleVisit = asyncHandler(async (req, res) => {
   const visit = await findOwnedVisit(req)
+  const newSchedule = new Date(req.body.scheduledAt)
+  if (isNaN(newSchedule.getTime())) {
+    throw ApiError.badRequest('Invalid date and time for rescheduled visit')
+  }
+  if (newSchedule.getTime() < Date.now() - 5 * 60 * 1000) {
+    throw ApiError.badRequest('Cannot reschedule to a past date or time. Please select an upcoming date and time.')
+  }
+  if (visit.scheduledAt && newSchedule.getTime() <= new Date(visit.scheduledAt).getTime()) {
+    throw ApiError.badRequest('Cannot select a previous or earlier visit date. You can only choose a date and time after the existing visit schedule.')
+  }
   visit.status = VISIT_STATUS.RESCHEDULED
   visit.reason = req.body.reason
   visit.timeline.push({ type: 'rescheduled', note: req.body.reason || 'Visit rescheduled' })

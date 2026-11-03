@@ -2,13 +2,52 @@ import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader, Card, Button, ExportMenu, Loader, ErrorState } from '../../components/ui.jsx'
 import { registrationsApi } from '../../api/resources.js'
+import { useState } from 'react'
 import { useFetch } from '../../hooks/useFetch.js'
+import { useToast } from '../../context/ToastContext.jsx'
+import { formatDate } from '../../lib/format.js'
 import { exportRowsToCsv } from '../../lib/format.js'
 
 export default function RegistrationReports() {
   const navigate = useNavigate()
   const { data, loading, error, refetch } = useFetch(useCallback(() => registrationsApi.reports(), []))
   const r = data || { byStatus: [], byType: [], byEmployee: [] }
+  const toast = useToast()
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadMasterCsv = async () => {
+    setDownloading(true)
+    try {
+      const res = await registrationsApi.list({ limit: 1000 })
+      const list = res.data?.data || res.data || []
+      if (!list.length) {
+        toast.info('No registration cases available')
+        return
+      }
+      exportRowsToCsv('registration-master-report.csv', list.map((c) => ({
+        'Case Code': c.caseCode || '—',
+        'Customer': c.customerName || '—',
+        'Booking': c.bookingLabel || '—',
+        'Project': c.project || '—',
+        'Unit': c.unitNumber || '—',
+        'Branch': c.branch || '—',
+        'Registration Type': c.registrationType || '—',
+        'Authority': c.registrationAuthority || '—',
+        'Status': c.status || '—',
+        'Expected Date': formatDate(c.expectedRegistrationDate),
+        'Appointment Date': formatDate(c.appointmentDate),
+        'Registration Date': formatDate(c.registrationDate),
+        'Assigned Employee': c.assignedEmployee?.name || c.assignedEmployeeName || '—',
+        'Remarks': c.remarks || '—'
+      })))
+      toast.success('Master registration report downloaded successfully (CSV)')
+    } catch {
+      toast.error('Failed to download master report')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
 
   const exportStatus = () => exportRowsToCsv('registration-status.csv', r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases })))
   const exportType = () => exportRowsToCsv('registration-type.csv', r.byType.map((x) => ({ Type: x._id || '—', Cases: x.cases })))
@@ -18,7 +57,16 @@ export default function RegistrationReports() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-3 mb-2">← Back to Dashboard</Button>
-        <PageHeader title="Registration Reports" subtitle="Live insights across all registration cases." />
+        <PageHeader
+          title="Registration Reports"
+          subtitle="Live insights across all registration cases."
+          actions={
+            <Button variant="primary" onClick={handleDownloadMasterCsv} disabled={downloading}>
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>{downloading ? 'Downloading CSV…' : 'Download CSV Report'}</span>
+            </Button>
+          }
+        />
       </div>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (

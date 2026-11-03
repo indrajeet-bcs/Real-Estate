@@ -394,15 +394,15 @@ function RegisterModal({ onClose, onDone }) {
       </>
     }>
       <div className="space-y-4">
-        <Select label="Buyer" value={customer} onChange={(e) => setCustomer(e.target.value)}>
+        <Select label="Buyer" required value={customer} onChange={(e) => setCustomer(e.target.value)}>
           <option value="">Select a buyer…</option>
           {(customers || []).map((c) => <option key={c._id} value={c._id}>{c.name} · {c.mobile}</option>)}
         </Select>
-        <Select label="Project" value={project} onChange={(e) => { setProject(e.target.value); setUnit('') }}>
+        <Select label="Project" required value={project} onChange={(e) => { setProject(e.target.value); setUnit('') }}>
           <option value="">Select a project…</option>
           {(projects || []).map((p) => <option key={p._id} value={p._id}>{p.name} (commission {p.commissionRate || 0}%)</option>)}
         </Select>
-        <Select label="Available unit" value={unit} onChange={(e) => setUnit(e.target.value)} disabled={!project}>
+        <Select label="Available unit" required value={unit} onChange={(e) => setUnit(e.target.value)} disabled={!project}>
           <option value="">{project ? 'Select an available unit…' : 'Choose a project first'}</option>
           {(units || []).map((u) => <option key={u._id} value={u._id}>{u.unitNumber} · {inr(u.price)}</option>)}
         </Select>

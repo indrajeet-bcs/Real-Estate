@@ -306,9 +306,9 @@ function BranchModal({ branch, onClose, onDone }) {
       </>
     }>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Branch name" value={form.name} onChange={set('name')} placeholder="e.g. Andheri West Office" />
+        <Input label="Branch name" required value={form.name} onChange={set('name')} placeholder="e.g. Andheri West Office" />
         <Input label="Branch code" value={form.code} onChange={set('code')} placeholder="e.g. MUM-01" />
-        <Input label="City" value={form.city} onChange={set('city')} placeholder="e.g. Mumbai" />
+        <Input label="City" required value={form.city} onChange={set('city')} placeholder="e.g. Mumbai" />
         <Input label="Region" value={form.region} onChange={set('region')} placeholder="e.g. West" />
         <Input label="Contact number" value={form.contactNumber} onChange={set('contactNumber')} placeholder="e.g. +91 98765 43210" />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} placeholder="branch@company.com" />
@@ -366,16 +366,16 @@ function TargetModal({ branch, onClose, onDone }) {
       </>
     }>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Select label="Target period" value={form.targetPeriod} onChange={set('targetPeriod')}>
+        <Select label="Target period" required value={form.targetPeriod} onChange={set('targetPeriod')}>
           <option value="monthly">Monthly</option>
           <option value="quarterly">Quarterly</option>
           <option value="yearly">Yearly</option>
         </Select>
-        <Input label="Revenue target (₹)" type="number" value={form.monthlyTarget} onChange={set('monthlyTarget')} />
+        <Input label="Revenue target (₹)" required type="number" value={form.monthlyTarget} onChange={set('monthlyTarget')} />
         <Input label="Sales target (count)" type="number" value={form.salesTarget} onChange={set('salesTarget')} />
         <Input label="Booking target (count)" type="number" value={form.bookingTarget} onChange={set('bookingTarget')} />
-        <Input label="Start date" type="date" value={form.targetStartDate} onChange={set('targetStartDate')} />
-        <Input label="End date" type="date" value={form.targetEndDate} onChange={set('targetEndDate')} />
+        <Input label="Start date" required type="date" value={form.targetStartDate} onChange={set('targetStartDate')} />
+        <Input label="End date" required type="date" value={form.targetEndDate} onChange={set('targetEndDate')} />
         <div className="sm:col-span-2">
           <Input label="Remarks (optional)" value={form.targetRemarks} onChange={set('targetRemarks')} placeholder="Context for this target period" />
         </div>

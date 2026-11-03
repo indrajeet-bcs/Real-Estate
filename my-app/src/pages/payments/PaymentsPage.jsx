@@ -79,11 +79,7 @@ function downloadCSV(filename, rows) {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url)
 }
-function downloadExcel(filename, sections) {
-  const tables = sections.map((s) => `<h3>${s.title}</h3><table border="1">${[s.head, ...s.rows].map((r) => `<tr>${r.map((c) => `<td>${c ?? ''}</td>`).join('')}</tr>`).join('')}</table>`).join('<br/>')
-  const blob = new Blob([`<html><head><meta charset="utf-8"></head><body>${tables}</body></html>`], { type: 'application/vnd.ms-excel' })
-  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url)
-}
+function downloadExcel(filename, sections) { const safeName = filename.replace(/\.xls[x]?$/, '.csv'); const rows = sections.flatMap((s) => [[s.title], s.head, ...s.rows, []]); downloadCSV(safeName, rows) }
 
 function Bars({ items, money = false, empty = 'No data' }) {
   const max = Math.max(1, ...items.map((i) => i.value))

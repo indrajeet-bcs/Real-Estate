@@ -657,11 +657,11 @@ function BuilderModal({ builder, onClose, onDone }) {
       <><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy || form.name.trim().length < 2}>{isNew ? 'Onboard' : 'Save'}</Button></>
     }>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Legal builder name" value={form.name} onChange={set('name')} />
-        <Input label="Contact person" value={form.contactPerson} onChange={set('contactPerson')} />
-        <Input label="Mobile" value={form.phone} onChange={set('phone')} />
+        <Input label="Legal builder name" required value={form.name} onChange={set('name')} />
+        <Input label="Contact person" required value={form.contactPerson} onChange={set('contactPerson')} />
+        <Input label="Mobile" required value={form.phone} onChange={set('phone')} />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} />
-        <Input label="City" value={form.city} onChange={set('city')} />
+        <Input label="City" required value={form.city} onChange={set('city')} />
         <Input label="GST number" value={form.gstNumber} onChange={set('gstNumber')} />
         <Input label="RERA certificate" value={form.reraCert} onChange={set('reraCert')} placeholder="MHARERA-BLD90291" />
         <Input label="RERA expiry" type="date" value={form.reraExpiry} onChange={set('reraExpiry')} />
@@ -705,12 +705,12 @@ function ProjectModal({ project, builders, onClose, onDone }) {
       <><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy || !form.name || !form.builder}>{isNew ? 'Register' : 'Save'}</Button></>
     }>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Project name" value={form.name} onChange={set('name')} />
-        <Select label="Builder" value={form.builder} onChange={set('builder')}>
+        <Input label="Project name" required value={form.name} onChange={set('name')} />
+        <Select label="Builder" required value={form.builder} onChange={set('builder')}>
           <option value="">Select builder…</option>
           {builders.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
         </Select>
-        <Input label="Location" value={form.location} onChange={set('location')} />
+        <Input label="Location" required value={form.location} onChange={set('location')} />
         <Input label="Property type" value={form.propertyType} onChange={set('propertyType')} placeholder="apartment / villa / plot" />
         <Input label="RERA number" value={form.reraNumber} onChange={set('reraNumber')} />
         <Input label="Commission rate (%)" type="number" value={form.commissionRate} onChange={set('commissionRate')} placeholder="2.5" />

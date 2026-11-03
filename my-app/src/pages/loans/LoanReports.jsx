@@ -2,7 +2,10 @@ import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader, Card, Button, ExportMenu, Loader, ErrorState } from '../../components/ui.jsx'
 import { loansApi } from '../../api/resources.js'
+import { useState } from 'react'
 import { useFetch } from '../../hooks/useFetch.js'
+import { useToast } from '../../context/ToastContext.jsx'
+import { formatDate } from '../../lib/format.js'
 import { exportRowsToCsv } from '../../lib/format.js'
 
 const inrL = (n) => `₹${((Number(n) || 0) / 100000).toFixed(2)}L`
@@ -11,6 +14,40 @@ export default function LoanReports() {
   const navigate = useNavigate()
   const { data, loading, error, refetch } = useFetch(useCallback(() => loansApi.reports(), []))
   const r = data || { byBank: [], byStatus: [], byExecutive: [] }
+  const toast = useToast()
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadMasterCsv = async () => {
+    setDownloading(true)
+    try {
+      const res = await loansApi.list({ limit: 1000 })
+      const list = res.data?.data || res.data || []
+      if (!list.length) {
+        toast.info('No loan cases available')
+        return
+      }
+      exportRowsToCsv('loan-master-report.csv', list.map((c) => ({
+        'Case Code': c.caseCode || '—',
+        'Customer': c.customerName || '—',
+        'Booking': c.bookingLabel || '—',
+        'Bank': c.bankName || '—',
+        'Loan Amount': c.loanAmountRequested || 0,
+        'Sanctioned Amount': c.loanAmountSanctioned || 0,
+        'Disbursed Amount': c.disbursedAmount || 0,
+        'Status': c.status || '—',
+        'Assigned Executive': c.assignedExecutive?.name || c.assignedExecutiveName || '—',
+        'Sanction Date': formatDate(c.sanctionDate),
+        'Disbursement Date': formatDate(c.disbursementDate),
+        'Remarks': c.remarks || '—'
+      })))
+      toast.success('Master loan report downloaded successfully (CSV)')
+    } catch {
+      toast.error('Failed to download master loan report')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
 
   const exportBank = () => exportRowsToCsv('loan-bank-summary.csv', r.byBank.map((x) => ({ Bank: x._id || '—', Cases: x.cases, Sanctioned: x.sanctioned || 0, Disbursed: x.disbursed || 0 })))
   const exportStatus = () => exportRowsToCsv('loan-status-summary.csv', r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases })))
@@ -20,7 +57,16 @@ export default function LoanReports() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-3 mb-2">← Back to Dashboard</Button>
-        <PageHeader title="Loan Reports" subtitle="Live insights across all loan processes." />
+        <PageHeader
+          title="Loan Reports"
+          subtitle="Live insights across all loan processes."
+          actions={
+            <Button variant="primary" onClick={handleDownloadMasterCsv} disabled={downloading}>
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>{downloading ? 'Downloading CSV…' : 'Download CSV Report'}</span>
+            </Button>
+          }
+        />
       </div>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (

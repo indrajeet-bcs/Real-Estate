@@ -87,7 +87,14 @@ function CreateVisitModal({ onClose, onDone }) {
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  const now = new Date()
+  const minDateTimeLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+
   async function save() {
+    if (form.scheduledAt && new Date(form.scheduledAt).getTime() < Date.now() - 5 * 60 * 1000) {
+      toast.error('Visit date & time cannot be in the past. Please select an upcoming date and time.')
+      return
+    }
     setBusy(true)
     try {
       await visitsApi.create(form)
@@ -116,7 +123,7 @@ function CreateVisitModal({ onClose, onDone }) {
           <option value="">Select…</option>
           {(projects || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
         </Select>
-        <Input label="Date & time" type="datetime-local" value={form.scheduledAt} onChange={set('scheduledAt')} />
+        <Input label="Date & time" type="datetime-local" min={minDateTimeLocal} value={form.scheduledAt} onChange={set('scheduledAt')} />
       </div>
     </Modal>
   )

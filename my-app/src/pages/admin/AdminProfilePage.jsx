@@ -96,9 +96,9 @@ function PersonalInfo({ user, editing, onCancel, onSaved }) {
       {editing ? (
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Full Name" value={form.name} onChange={set('name')} />
+            <Input label="Full Name" required value={form.name} onChange={set('name')} />
             <Input label="Designation" value={form.designation} onChange={set('designation')} placeholder="e.g. Company Owner" />
-            <Input label="Mobile Number" value={form.phone} onChange={set('phone')} />
+            <Input label="Mobile Number" required value={form.phone} onChange={set('phone')} />
             <Input label="Alternate Mobile Number (optional)" value={form.altMobile} onChange={set('altMobile')} />
           </div>
           <Input label="Profile Photo URL (optional)" value={form.avatar} onChange={set('avatar')} placeholder="https://…" />
@@ -153,9 +153,9 @@ function Security({ user }) {
       <div className="border-t border-slate-100 pt-5">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Change Password</p>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Input label="Current Password" type="password" value={form.currentPassword} onChange={set('currentPassword')} />
-          <Input label="New Password" type="password" value={form.newPassword} onChange={set('newPassword')} />
-          <Input label="Confirm Password" type="password" value={form.confirmPassword} onChange={set('confirmPassword')} error={mismatch ? 'Passwords do not match' : undefined} />
+          <Input label="Current Password" required type="password" value={form.currentPassword} onChange={set('currentPassword')} />
+          <Input label="New Password" required type="password" value={form.newPassword} onChange={set('newPassword')} />
+          <Input label="Confirm Password" required type="password" value={form.confirmPassword} onChange={set('confirmPassword')} error={mismatch ? 'Passwords do not match' : undefined} />
         </div>
         <p className="mt-2 text-xs text-slate-500">New password must be at least 8 characters. Changing it signs you out of all devices.</p>
         <div className="mt-4">

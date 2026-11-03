@@ -1,3 +1,4 @@
+import UserRegistrationModal from '../../components/users/UserRegistrationModal.jsx'
 import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
@@ -284,8 +285,27 @@ function RosterTab() {
       )}
 
       {transferFor && <TransferModal user={transferFor} branches={branches || []} subAdmins={subAdmins || []} onClose={() => setTransferFor(null)} onDone={() => { setTransferFor(null); refetch() }} />}
-      {editFor && <EmployeeModal user={editFor} branches={branches || []} onClose={() => setEditFor(null)} onDone={() => { setEditFor(null); refetch() }} />}
-      {showCreate && <EmployeeModal branches={branches || []} onClose={() => setShowCreate(false)} onDone={() => { setShowCreate(false); refetch() }} />}
+      {editFor && (
+        <UserRegistrationModal
+          open={!!editFor}
+          user={editFor}
+          branches={branches || []}
+          allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
+          defaultRole={editFor.role || 'sales_executive'}
+          onClose={() => setEditFor(null)}
+          onDone={() => { setEditFor(null); refetch() }}
+        />
+      )}
+      {showCreate && (
+        <UserRegistrationModal
+          open={showCreate}
+          branches={branches || []}
+          allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
+          defaultRole="sales_executive"
+          onClose={() => setShowCreate(false)}
+          onDone={() => { setShowCreate(false); refetch() }}
+        />
+      )}
       {showImport && <ImportModal branches={branches || []} onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); refetch() }} />}
       {historyFor && <HistoryModal user={historyFor} onClose={() => setHistoryFor(null)} />}
     </div>

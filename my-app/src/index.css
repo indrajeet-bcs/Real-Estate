@@ -8,11 +8,10 @@
 body {
   background-color: #f8fafc; /* slate-50 */
   color: #0f172a; /* slate-900 */
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Material Symbols (Outlined) — consistent icon set across the app. FILL 0 keeps
-   them outlined. The word-ligature is hidden until the icon font loads so the raw
-   text (e.g. "dashboard") never flashes in the sidebar. */
+/* Material Symbols (Outlined) */
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
@@ -30,7 +29,7 @@ body {
   -webkit-font-smoothing: antialiased;
   user-select: none;
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  color: transparent; /* hide the ligature word until the font paints the glyph */
+  color: transparent;
 }
 .fonts-loaded .material-symbols-outlined {
   color: inherit;
@@ -39,19 +38,163 @@ body {
 /* Thin, modern scrollbar utility (opt-in). */
 .thin-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent; /* slate-300 */
+  scrollbar-color: #cbd5e1 transparent;
 }
 .thin-scroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1; /* slate-300 */
+  background-color: #cbd5e1;
   border-radius: 9999px;
 }
 .thin-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8; /* slate-400 */
+  background-color: #94a3b8;
 }
 .thin-scroll::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK THEME SYSTEM — Deep Slate / Charcoal Palette
+   Applies automatically whenever <html class="dark"> or [data-theme="dark"]
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #090d16 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Base Surfaces & Containers */
+html.dark .bg-slate-50,
+html.dark main.bg-slate-50,
+html.dark [class*="bg-slate-50"] {
+  background-color: #090d16 !important;
+}
+
+html.dark .bg-white,
+html.dark [class*="bg-white"] {
+  background-color: #111827 !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #1f2937 !important;
+}
+
+html.dark .bg-slate-200 {
+  background-color: #374151 !important;
+}
+
+/* Borders & Dividers */
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark [class*="border-slate-100"],
+html.dark [class*="border-slate-200"] {
+  border-color: #1f2937 !important;
+}
+
+html.dark .border-slate-300 {
+  border-color: #374151 !important;
+}
+
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1f2937 !important;
+}
+
+/* Typography Hierarchy */
+html.dark .text-slate-900,
+html.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+html.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Form Controls & Inputs */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #3b82f6 !important;
+  outline: none;
+  box-shadow: 0 0 0 1px #3b82f6 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #475569 !important;
+}
+
+/* Tables */
+html.dark table thead,
+html.dark table thead tr,
+html.dark table th {
+  background-color: #0f172a !important;
+  color: #94a3b8 !important;
+  border-bottom-color: #1f2937 !important;
+}
+
+html.dark table tbody tr {
+  border-bottom-color: #1f2937 !important;
+}
+
+html.dark table tbody tr:hover {
+  background-color: #1e293b !important;
+}
+
+html.dark td {
+  border-color: #1f2937 !important;
+}
+
+/* Navigation & Interactive Hover States */
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #1f2937 !important;
+}
+
+html.dark .hover\:text-slate-900:hover,
+html.dark .hover\:text-slate-800:hover {
+  color: #ffffff !important;
+}
+
+/* Subtle Cards & Modal Elevation in Dark Mode */
+html.dark .shadow-sm,
+html.dark .shadow,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Scrollbars in Dark Mode */
+html.dark .thin-scroll {
+  scrollbar-color: #334155 transparent;
+}
+html.dark .thin-scroll::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+html.dark .thin-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #475569;
 }

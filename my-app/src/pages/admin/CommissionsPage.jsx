@@ -280,22 +280,22 @@ function RuleModal({ rule, onClose, onDone }) {
     }>
       <div className="space-y-4">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Basic Information</div>
-        <Input label="Rule name" value={form.name} onChange={set('name')} placeholder="e.g. Standard General Brokerage" />
+        <Input label="Rule name" required value={form.name} onChange={set('name')} placeholder="e.g. Standard General Brokerage" />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select label="Applicable To" value={form.appliesTo} onChange={set('appliesTo')}>
+          <Select label="Applicable To" required value={form.appliesTo} onChange={set('appliesTo')}>
             <option value="all">All Builders</option>
             <option value="builder">Specific Builder</option>
             <option value="project">Specific Project</option>
           </Select>
           {form.appliesTo === 'builder' && (
-            <Select label="Builder" value={form.builder} onChange={set('builder')}>
+            <Select label="Builder" required value={form.builder} onChange={set('builder')}>
               <option value="">Select a builder…</option>
               {(builders || []).map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
             </Select>
           )}
           {form.appliesTo === 'project' && (
-            <Select label="Project" value={form.project} onChange={set('project')}>
+            <Select label="Project" required value={form.project} onChange={set('project')}>
               <option value="">Select a project…</option>
               {(projects || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
             </Select>
@@ -303,12 +303,12 @@ function RuleModal({ rule, onClose, onDone }) {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input label="Commission Percentage (%)" type="number" value={form.baseRate} onChange={set('baseRate')} />
+          <Input label="Commission Percentage (%)" required type="number" value={form.baseRate} onChange={set('baseRate')} />
           <Input label="Accelerator Percentage (optional)" type="number" value={form.acceleratorRate} onChange={set('acceleratorRate')} />
         </div>
         <Input label="Threshold Amount (optional, ₹)" type="number" value={form.targetThreshold} onChange={set('targetThreshold')} />
 
-        <Select label="Status" value={form.active ? 'active' : 'inactive'} onChange={(e) => setForm((f) => ({ ...f, active: e.target.value === 'active' }))}>
+        <Select label="Status" required value={form.active ? 'active' : 'inactive'} onChange={(e) => setForm((f) => ({ ...f, active: e.target.value === 'active' }))}>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </Select>
