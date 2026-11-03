@@ -206,13 +206,14 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   await user.save()
 
   // Send real OTP email to the registered address
-  await sendOtpEmail({
+  const emailResult = await sendOtpEmail({
     to: user.email,
     name: user.name,
     otp,
   })
 
-  const devOtp = isProd ? undefined : otp
+  // Only show devOtp if real email was not sent (e.g. SMTP credentials missing in dev)
+  const devOtp = (!isProd && !emailResult?.sent) ? otp : undefined
   return ok(res, { devOtp }, 'If the account exists, an OTP has been sent')
 })
 
