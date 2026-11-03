@@ -85,6 +85,8 @@ import BranchSettingsPage from './pages/subadmin/BranchSettingsPage.jsx'
 
 // Admin (Company Owner)
 import AdminProfilePage from './pages/admin/AdminProfilePage.jsx'
+import AdminTasksPage from './pages/admin/AdminTasksPage.jsx'
+import SubAdminTasksPage from './pages/subadmin/SubAdminTasksPage.jsx'
 import BranchesPage from './pages/admin/BranchesPage.jsx'
 import BranchDetailsPage from './pages/admin/BranchDetailsPage.jsx'
 import AdminEmployeesPage from './pages/admin/AdminEmployeesPage.jsx'
@@ -198,6 +200,7 @@ export default function App() {
               <Route path="branches/:id" element={<BranchDetailsPage />} />
               <Route path="employees" element={<AdminEmployeesPage />} />
               <Route path="employees/:id" element={<AdminEmployeeDetailsPage />} />
+              <Route path="tasks" element={<AdminTasksPage />} />
 
               {/* Inventory & KYC */}
               <Route path="inventory" element={<InventoryPage />} />
@@ -283,6 +286,7 @@ export default function App() {
               <Route path="inventory/projects/:id" element={<ProjectDetailsPage />} />
               <Route path="attendance" element={<AttendanceLeavesPage />} />
               <Route path="followups" element={<SubAdminFollowUpsPage />} />
+              <Route path="tasks" element={<SubAdminTasksPage />} />
               <Route path="visits" element={<SubAdminVisitsPage />} />
               <Route path="bookings" element={<AdminBookingsPage basePath="/sub-admin/bookings" title="Bookings" subtitle="Manage branch bookings, payments, discounts, transfers and registration." />} />
               <Route path="bookings/:id" element={<BookingDetailsPage />} />

@@ -47,6 +47,7 @@ export const ROLE_PERMISSIONS = {
     [MODULES.REGISTRATION]: ['view', 'create', 'edit', 'delete', 'export'], // Registration tracking
     [MODULES.POSSESSION]: ['view', 'create', 'edit', 'delete', 'export'], // Possession tracking
     [MODULES.ROLE]: ['view', 'create', 'edit', 'delete'], // Custom-role engine (Admin)
+    [MODULES.TASK]: ['view', 'create', 'edit', 'delete', 'assign'], // Task Management: assign & track executive tasks
   },
 
   [SUB_ADMIN]: {
@@ -73,6 +74,7 @@ export const ROLE_PERMISSIONS = {
     // (+ delete for Finance). Remove 'delete' per-user for a pure Branch Admin.
     // 'verify' gates expense verification; 'edit' also gates category management.
     [MODULES.EXPENSE]: ['view', 'create', 'edit', 'export', 'verify', 'delete'],
+    [MODULES.TASK]: ['view', 'create', 'edit', 'delete', 'assign'], // Task Management: assign & track executive tasks
     // Legal: Legal team + Branch Admin / Team Leader. 'assign' = assign legal
     // executive; 'verify' = verify documents. Pure Branch Admin can have
     // verify/delete removed per-user (they mainly assign + monitor).
@@ -112,6 +114,7 @@ export const ROLE_PERMISSIONS = {
     [MODULES.LOAN]: ['view', 'create', 'edit'],
     [MODULES.REGISTRATION]: ['view', 'create', 'edit'],
     [MODULES.POSSESSION]: ['view', 'create', 'edit'],
+    [MODULES.TASK]: ['view', 'create', 'edit'], // Task Management: view assigned tasks & update status
   },
 }
 

@@ -10,26 +10,35 @@ const objId = z.string().regex(/^[0-9a-fA-F]{24}$/)
 const createSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional().or(z.literal('')),
-  dueDate: z.coerce.date().optional().or(z.literal('')),
-  dueTime: z.string().optional().or(z.literal('')),
+  dueDate: z.coerce.date().optional().or(z.literal('')).or(z.null()),
+  dueTime: z.string().optional().or(z.literal('')).or(z.null()),
   priority: z.enum(['low', 'medium', 'high']).optional(),
   relatedType: z.enum(['lead', 'customer', 'booking', 'site_visit', 'none']).optional(),
-  relatedId: objId.optional().or(z.literal('')),
+  relatedId: objId.optional().or(z.literal('')).or(z.null()),
+  assignedTo: objId.optional().or(z.literal('')).or(z.null()),
+  owner: objId.optional().or(z.literal('')).or(z.null()),
+  status: z.enum(['pending', 'in_progress', 'on_hold', 'completed']).optional(),
 })
+
 const updateSchema = createSchema.partial()
 const statusSchema = z.object({ status: z.enum(['pending', 'in_progress', 'on_hold', 'completed']) })
 const progressSchema = z.object({ status: z.enum(['pending', 'in_progress', 'on_hold']).optional(), progressNote: z.string().optional().or(z.literal('')) })
 const completeSchema = z.object({ completionRemarks: z.string().optional().or(z.literal('')) })
 const commentSchema = z.object({ text: z.string().min(1, 'Comment cannot be empty'), parent: objId.optional().or(z.literal('')) })
 const listSchema = z.object({
-  status: z.enum(['pending', 'in_progress', 'on_hold', 'completed']).optional(),
-  priority: z.enum(['low', 'medium', 'high']).optional(),
-  official: z.enum(['true', 'false']).optional(),
-  scope: z.enum(['today']).optional(),
+  status: z.string().optional(),
+  priority: z.string().optional(),
+  official: z.string().optional(),
+  scope: z.string().optional(),
+  assignedTo: z.string().optional(),
+  owner: z.string().optional(),
+  search: z.string().optional(),
+  limit: z.coerce.number().optional(),
+  page: z.coerce.number().optional(),
 })
 
 const router = Router()
-router.use(authenticate) // personal resource - owner-scoped in the controller
+router.use(authenticate)
 
 router.get('/', validate(listSchema, 'query'), ctrl.listTasks)
 router.get('/:id', ctrl.getTask)
