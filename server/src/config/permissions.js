@@ -50,7 +50,7 @@ export const ROLE_PERMISSIONS = {
   },
 
   [SUB_ADMIN]: {
-    [MODULES.USER]: ['view', 'create', 'edit', 'delete'], // sales executives
+    [MODULES.USER]: ['view', 'create', 'edit'], // sales executives
     [MODULES.BUILDER]: ['view'],
     [MODULES.PROJECT]: ['view'],
     [MODULES.UNIT]: ['view', 'edit'], // Branch-admin port: hold/release units

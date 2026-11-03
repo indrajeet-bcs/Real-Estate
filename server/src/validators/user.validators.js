@@ -21,16 +21,24 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().min(2).optional(),
+  email: z.string().email().optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
   phone: z.string().optional(),
   branch: z.string().optional(),
   team: z.string().optional(),
-  manager: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+  manager: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable().or(z.literal('')),
+  employeeId: z.string().optional(),
   designation: z.string().optional(),
   joiningDate: z.coerce.date().optional(),
   targetRevenue: z.coerce.number().min(0).optional(),
   targetSales: z.coerce.number().min(0).optional(),
+  role: z.enum([ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE]).optional(),
   permissions: z.record(z.array(z.string())).optional(),
 })
+
+export const deleteUserSchema = z.object({
+  reassignTo: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+}).optional().default({})
 
 export const listUsersSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
