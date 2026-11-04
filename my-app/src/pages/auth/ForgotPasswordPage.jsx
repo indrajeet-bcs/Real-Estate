@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { authApi } from '../../api/auth.api.js'
 
@@ -14,6 +14,13 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [resendTimer, setResendTimer] = useState(0)
+
+  useEffect(() => {
+    if (resendTimer <= 0) return
+    const id = setInterval(() => setResendTimer((t) => t - 1), 1000)
+    return () => clearInterval(id)
+  }, [resendTimer])
 
   async function requestOtp(e) {
     if (e) e.preventDefault()
@@ -28,6 +35,7 @@ export default function ForgotPasswordPage() {
           ? `OTP sent to ${email}. (Dev OTP: ${data.data.devOtp})`
           : `A 6-digit verification code has been sent to ${email}. Please check your email inbox and spam folder.`
       )
+      setResendTimer(30)
       setStep('reset')
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to send OTP. Please try again.')
@@ -209,11 +217,11 @@ export default function ForgotPasswordPage() {
             <div className="pt-2 text-center">
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || resendTimer > 0}
                 onClick={requestOtp}
-                className="text-xs text-slate-500 hover:text-blue-600 disabled:opacity-50"
+                className="text-xs text-slate-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:text-slate-400"
               >
-                Didn't receive code? Resend OTP
+                {resendTimer > 0 ? `Resend code in ${resendTimer}s` : "Didn't receive code? Resend OTP"}
               </button>
             </div>
           </form>

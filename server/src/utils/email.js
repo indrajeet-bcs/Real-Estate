@@ -16,6 +16,11 @@ function getTransporter() {
   const transportConfig = isGmail
     ? {
         service: 'gmail',
+        pool: true, // Keep connections alive for instant dispatch
+        maxConnections: 5,
+        maxMessages: 100,
+        rateDelta: 1000,
+        rateLimit: 5,
         auth: {
           user: env.email.user,
           pass: env.email.pass.replace(/\s+/g, ''), // strip spaces if copied with spaces
@@ -25,6 +30,7 @@ function getTransporter() {
         host: env.email.host,
         port: env.email.port,
         secure: env.email.secure,
+        pool: true,
         auth: {
           user: env.email.user,
           pass: env.email.pass,
@@ -36,7 +42,7 @@ function getTransporter() {
 }
 
 /**
- * Send a generic email.
+ * Send a generic email with high-priority transactional headers.
  */
 export async function sendEmail({ to, subject, html, text }) {
   const mailer = getTransporter()
@@ -53,6 +59,12 @@ export async function sendEmail({ to, subject, html, text }) {
       subject,
       text,
       html,
+      priority: 'high',
+      headers: {
+        'X-Priority': '1 (Highest)',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'High',
+      },
     })
     // eslint-disable-next-line no-console
     console.log(`[email] Successfully sent message ${info.messageId} to ${to}`)

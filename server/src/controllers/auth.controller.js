@@ -205,15 +205,18 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 min
   await user.save()
 
-  // Send real OTP email to the registered address
-  const emailResult = await sendOtpEmail({
+  // Dispatch real OTP email immediately in background for zero-latency response
+  sendOtpEmail({
     to: user.email,
     name: user.name,
     otp,
+  }).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('[forgotPassword] Failed to send OTP email in background:', err.message)
   })
 
-  // Only show devOtp if real email was not sent (e.g. SMTP credentials missing in dev)
-  const devOtp = (!isProd && !emailResult?.sent) ? otp : undefined
+  // Only expose devOtp in development if SMTP credentials are missing
+  const devOtp = (!isProd && (!process.env.EMAIL_PASS || process.env.EMAIL_PASS === 'your_16_digit_app_password_here')) ? otp : undefined
   return ok(res, { devOtp }, 'If the account exists, an OTP has been sent')
 })
 
