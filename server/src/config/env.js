@@ -37,6 +37,15 @@ export const env = {
     email: process.env.SEED_SUPERADMIN_EMAIL || 'superadmin@crm.local',
     password: process.env.SEED_SUPERADMIN_PASSWORD || 'SuperAdmin@123',
   },
+
+  email: {
+    host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.EMAIL_PORT || process.env.SMTP_PORT) || 587,
+    secure: process.env.EMAIL_SECURE === 'true',
+    user: process.env.EMAIL_USER || process.env.SMTP_USER || 'thoratindrajeet30@gmail.com',
+    pass: process.env.EMAIL_PASS || process.env.SMTP_PASS || '',
+    from: process.env.EMAIL_FROM || process.env.SMTP_FROM || 'Real Estate CRM <thoratindrajeet30@gmail.com>',
+  },
 }
 
 export const isProd = env.nodeEnv === 'production'

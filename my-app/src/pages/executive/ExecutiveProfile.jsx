@@ -26,7 +26,7 @@ export default function ExecutiveProfile() {
 
   async function handleLogout() {
     await logout()
-    navigate('/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   return (

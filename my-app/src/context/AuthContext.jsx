@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api, { setAccessToken, setUnauthorizedHandler, setSessionUpdatedHandler } from '../api/client.js'
 import { authApi } from '../api/auth.api.js'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
+  const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [permissions, setPermissions] = useState({})
   const [loading, setLoading] = useState(true)
@@ -15,9 +17,12 @@ export function AuthProvider({ children }) {
     setPermissions({})
   }, [])
 
-  // On refresh failure anywhere, drop the session.
+  // On refresh failure anywhere, drop the session and redirect to landing page.
   useEffect(() => {
-    setUnauthorizedHandler(clearSession)
+    setUnauthorizedHandler(() => {
+      clearSession()
+      navigate('/', { replace: true })
+    })
     setSessionUpdatedHandler((newUser) => {
       if (newUser) {
         setUser(newUser)
@@ -26,7 +31,7 @@ export function AuthProvider({ children }) {
         // the protected route will redirect anyway.
       }
     })
-  }, [clearSession])
+  }, [clearSession, navigate])
 
   // On mount, try to restore a session via the refresh cookie.
   useEffect(() => {
@@ -69,8 +74,9 @@ export function AuthProvider({ children }) {
     } catch {
       /* ignore network errors on logout */
     }
+    navigate('/', { replace: true })
     clearSession()
-  }, [clearSession])
+  }, [clearSession, navigate])
 
   // Permission check mirroring the backend matrix (§14).
   const can = useCallback(

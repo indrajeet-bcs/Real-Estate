@@ -24,6 +24,7 @@ const ICONS = {
   pencil: (<path d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />),
   transfer: (<path d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-9L21 7.5m0 0L16.5 3m4.5 4.5H7.5" />),
   power: (<path d="M5.636 5.636a9 9 0 1 0 12.728 0M12 3v9" />),
+  trash: (<><path d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></>),
 }
 const TONES = {
   slate: 'border-slate-200 text-slate-600 hover:bg-slate-50',
@@ -121,6 +122,7 @@ function RosterTab() {
   const [showFilters, setShowFilters] = useState(false)
   const [transferFor, setTransferFor] = useState(null)
   const [editFor, setEditFor] = useState(null)
+  const [deleteFor, setDeleteFor] = useState(null)
   const [historyFor, setHistoryFor] = useState(null)
   const [disableFor, setDisableFor] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -206,6 +208,7 @@ function RosterTab() {
         {can('user', 'edit') && <IconBtn title="Edit" onClick={(e) => { e.stopPropagation(); setEditFor(r) }} icon={ICONS.pencil} />}
         {can('user', 'edit') && <IconBtn title="Transfer" onClick={(e) => { e.stopPropagation(); setTransferFor(r) }} icon={ICONS.transfer} />}
         {can('user', 'edit') && <IconBtn title={r.isActive ? 'Disable' : 'Enable'} tone={r.isActive ? 'danger' : 'success'} onClick={(e) => { e.stopPropagation(); r.isActive ? setDisableFor(r) : toggleActive(r) }} icon={ICONS.power} />}
+        {can('user', 'delete') && <IconBtn title="Delete" tone="danger" onClick={(e) => { e.stopPropagation(); setDeleteFor(r) }} icon={ICONS.trash} />}
       </div>
     ) },
   ]
@@ -284,6 +287,7 @@ function RosterTab() {
         </Modal>
       )}
 
+ preeti
       {transferFor && <TransferModal user={transferFor} branches={branches || []} subAdmins={subAdmins || []} onClose={() => setTransferFor(null)} onDone={() => { setTransferFor(null); refetch() }} />}
       {editFor && (
         <UserRegistrationModal
@@ -292,59 +296,127 @@ function RosterTab() {
           branches={branches || []}
           allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
           defaultRole={editFor.role || 'sales_executive'}
+          
+      {transferFor && (
+        <TransferModal
+          user={transferFor}
+          branches={branches || []}
+          subAdmins={subAdmins || []}
+          onClose={() => setTransferFor(null)}
+          onDone={() => { setTransferFor(null); refetch() }}
+        />
+      )}
+      {editFor && (
+        <EmployeeModal
+          user={editFor}
+          branches={branches || []}
+          subAdmins={subAdmins || []}
+ main
           onClose={() => setEditFor(null)}
           onDone={() => { setEditFor(null); refetch() }}
         />
       )}
       {showCreate && (
+ preeti
         <UserRegistrationModal
           open={showCreate}
           branches={branches || []}
           allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
           defaultRole="sales_executive"
+
+        <EmployeeModal
+          branches={branches || []}
+          subAdmins={subAdmins || []}
+main
           onClose={() => setShowCreate(false)}
           onDone={() => { setShowCreate(false); refetch() }}
         />
       )}
+ preeti
+
+      {deleteFor && (
+        <DeleteEmployeeModal
+          user={deleteFor}
+          otherStaff={rows.filter((u) => u._id !== deleteFor._id && u.isActive)}
+          onClose={() => setDeleteFor(null)}
+          onDone={() => { setDeleteFor(null); refetch() }}
+        />
+      )}
+ main
       {showImport && <ImportModal branches={branches || []} onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); refetch() }} />}
       {historyFor && <HistoryModal user={historyFor} onClose={() => setHistoryFor(null)} />}
     </div>
   )
 }
 
-// Add / Edit employee modal.
-function EmployeeModal({ user, branches, onClose, onDone }) {
+// Add / Edit employee modal (Admin can update all employee details and roles).
+export function EmployeeModal({ user, branches = [], subAdmins = [], onClose, onDone }) {
   const toast = useToast()
   const isNew = !user
   const [form, setForm] = useState({
-    name: user?.name || '', email: user?.email || '', password: '',
-    phone: user?.phone || '', branch: user?.branch || '', role: user?.role || 'sub_admin',
-    designation: user?.designation || '', targetRevenue: user?.targetRevenue || 0,
+    name: user?.name || '',
+    email: user?.email || '',
+    password: '',
+    phone: user?.phone || '',
+    branch: user?.branch || '',
+    manager: user?.manager?._id || user?.manager || '',
+    role: user?.role || 'sub_admin',
+    designation: user?.designation || '',
+    employeeId: user?.employeeId || '',
+    targetRevenue: user?.targetRevenue || 0,
+    targetSales: user?.targetSales || 0,
     joiningDate: user?.joiningDate ? String(user.joiningDate).slice(0, 10) : '',
   })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   async function save() {
+    if (isNew && (!form.password || form.password.length < 8)) {
+      toast.error('Password must be at least 8 characters')
+      return
+    }
+    if (!isNew && form.password && form.password.trim().length > 0 && form.password.trim().length < 8) {
+      toast.error('Password must be at least 8 characters if resetting')
+      return
+    }
     setBusy(true)
     try {
       if (isNew) {
         await usersApi.create({
-          name: form.name, email: form.email, password: form.password, role: form.role,
-          phone: form.phone, branch: form.branch, designation: form.designation,
-          targetRevenue: Number(form.targetRevenue) || 0, joiningDate: form.joiningDate || undefined,
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          phone: form.phone,
+          branch: form.branch,
+          manager: form.role === 'sales_executive' ? (form.manager || undefined) : undefined,
+          designation: form.designation,
+          employeeId: form.employeeId || undefined,
+          targetRevenue: Number(form.targetRevenue) || 0,
+          targetSales: Number(form.targetSales) || 0,
+          joiningDate: form.joiningDate || undefined,
         })
-        toast.success('Employee created')
+        toast.success('Employee created successfully')
       } else {
         await usersApi.update(user._id, {
-          name: form.name, phone: form.phone, branch: form.branch, designation: form.designation,
-          targetRevenue: Number(form.targetRevenue) || 0, joiningDate: form.joiningDate || undefined,
+          name: form.name,
+          email: form.email,
+          role: form.role,
+          phone: form.phone,
+          branch: form.branch,
+          manager: form.role === 'sales_executive' ? (form.manager || '') : '',
+          designation: form.designation,
+          employeeId: form.employeeId || undefined,
+          targetRevenue: Number(form.targetRevenue) || 0,
+          targetSales: Number(form.targetSales) || 0,
+          joiningDate: form.joiningDate || undefined,
+          ...(form.password && form.password.trim().length >= 8 ? { password: form.password.trim() } : {}),
         })
-        toast.success('Employee updated')
+        toast.success('Employee updated successfully')
       }
       onDone()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed')
+      toast.error(err.response?.data?.message || 'Failed to save employee')
     } finally { setBusy(false) }
   }
 
@@ -354,27 +426,116 @@ function EmployeeModal({ user, branches, onClose, onDone }) {
     <Modal open onClose={onClose} wide title={isNew ? 'Add Employee' : `Edit ${user.name}`} footer={
       <>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={save} disabled={busy || invalid}>{isNew ? 'Create' : 'Save'}</Button>
+        <Button onClick={save} disabled={busy || invalid}>{isNew ? 'Create' : 'Save Changes'}</Button>
       </>
     }>
       <div className="grid gap-4 sm:grid-cols-2">
-        {isNew && (
-          <Select label="Role" value={form.role} onChange={set('role')}>
-            <option value="sub_admin">Sub-Admin (Branch Admin)</option>
-            <option value="sales_executive">Sales Executive</option>
-          </Select>
-        )}
+        <Select label="Role" value={form.role} onChange={set('role')}>
+          <option value="sub_admin">Sub-Admin (Branch Admin)</option>
+          <option value="sales_executive">Sales Executive</option>
+        </Select>
         <Input label="Full name" value={form.name} onChange={set('name')} />
-        {isNew && <Input label="Email" type="email" value={form.email} onChange={set('email')} />}
-        {isNew && <Input label="Password (min 8 chars)" type="password" value={form.password} onChange={set('password')} />}
+        <Input label="Email" type="email" value={form.email} onChange={set('email')} />
+        <Input
+          label={isNew ? 'Password (min 8 chars)' : 'Reset Password (optional)'}
+          placeholder={isNew ? 'Password' : 'Leave empty to keep current password'}
+          type="password"
+          value={form.password}
+          onChange={set('password')}
+        />
+        <Input label="Employee ID" value={form.employeeId} onChange={set('employeeId')} placeholder="e.g. EMP-0001" />
         <Input label="Mobile" value={form.phone} onChange={set('phone')} />
         <Input label="Designation" value={form.designation} onChange={set('designation')} placeholder="e.g. Senior Sales Executive" />
         <Select label="Branch" value={form.branch} onChange={set('branch')}>
           <option value="">Unassigned</option>
           {branches.map((b) => <option key={b._id} value={b.name}>{b.name}</option>)}
         </Select>
+        {form.role === 'sales_executive' && (
+          <Select label="Assigned Sub-Admin" value={form.manager} onChange={set('manager')}>
+            <option value="">None / Unassigned</option>
+            {subAdmins.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name} ({s.branch || 'No branch'})
+              </option>
+            ))}
+          </Select>
+        )}
         <Input label="Joining date" type="date" value={form.joiningDate} onChange={set('joiningDate')} />
         <Input label="Revenue target (₹)" type="number" value={form.targetRevenue} onChange={set('targetRevenue')} />
+        <Input label="Sales target (Units)" type="number" value={form.targetSales} onChange={set('targetSales')} />
+      </div>
+    </Modal>
+  )
+}
+
+// Delete Employee Modal with lead reassignment options.
+export function DeleteEmployeeModal({ user, otherStaff = [], onClose, onDone }) {
+  const toast = useToast()
+  const [reassignTo, setReassignTo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const openLeads = user.activeLeadsCount || 0
+
+  async function handleDelete() {
+    setBusy(true)
+    try {
+      await usersApi.remove(user._id, { reassignTo: reassignTo || undefined })
+      toast.success(`Employee ${user.name} deleted successfully`)
+      onDone()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete employee')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Delete Employee · ${user.name}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="danger" onClick={handleDelete} disabled={busy}>
+            {busy ? 'Deleting…' : 'Delete Permanently'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4 text-sm text-slate-600">
+        <p>
+          Are you sure you want to permanently delete <strong>{user.name}</strong> ({user.employeeId || user.email})?
+          This will remove their account and revoke platform access immediately.
+        </p>
+
+        {openLeads > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-800">
+            <p className="font-semibold text-amber-900">
+              Active Leads Warning: This employee holds {openLeads} active lead{openLeads > 1 ? 's' : ''}.
+            </p>
+            <p className="mt-1">
+              Select an active team member below to reassign these leads to, or release them to the unassigned lead pool:
+            </p>
+            <div className="mt-2.5">
+              <Select
+                label="Reassign leads to"
+                value={reassignTo}
+                onChange={(e) => setReassignTo(e.target.value)}
+              >
+                <option value="">Release to unassigned pool</option>
+                {otherStaff.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name} ({titleCase(s.role)} - {s.branch || 'No branch'})
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3 text-xs text-rose-700">
+          <span className="font-medium">Note:</span> Only Admin has authority to delete employees. This action cannot be reversed.
+        </div>
       </div>
     </Modal>
   )
@@ -382,7 +543,7 @@ function EmployeeModal({ user, branches, onClose, onDone }) {
 
 // Transfer-branch modal: new branch → auto-loaded sub-admins → date/reason →
 // leads & tasks toggles → confirm (spec §Transfer Employee Workflow).
-function TransferModal({ user, branches, subAdmins, onClose, onDone }) {
+export function TransferModal({ user, branches, subAdmins, onClose, onDone }) {
   const toast = useToast()
   const [dest, setDest] = useState('')
   const [newManager, setNewManager] = useState('')

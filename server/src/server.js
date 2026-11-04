@@ -6,6 +6,7 @@ async function start() {
   try {
     // eslint-disable-next-line no-console
     console.log('[server] Initializing database connection...')
+
     await connectDB()
 
     // Explicitly bind to 0.0.0.0 so cloud environments like Render detect the open port immediately
@@ -19,9 +20,11 @@ async function start() {
       console.log(`\n[server] Received ${signal}. Shutting down gracefully...`)
       server.close(async () => {
         await disconnectDB()
+
         process.exit(0)
       })
     }
+
 
     process.on('SIGINT', () => shutdown('SIGINT'))
     process.on('SIGTERM', () => shutdown('SIGTERM'))

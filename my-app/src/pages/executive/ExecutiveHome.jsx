@@ -233,30 +233,82 @@ function TaskModal({ task, onClose, onDone }) {
   const toast = useToast()
   const isNew = !task._id
   const [form, setForm] = useState({
-    title: task.title || '', description: task.description || '',
-    dueDate: task.dueDate ? String(task.dueDate).slice(0, 10) : '', dueTime: task.dueTime || '',
-    priority: task.priority || 'medium', relatedType: task.relatedType || 'none',
+    title: task.title || '',
+    description: task.description || '',
+    dueDate: task.dueDate ? String(task.dueDate).slice(0, 10) : '',
+    dueTime: task.dueTime || '',
+    priority: task.priority || '',
+    relatedType: task.relatedType || 'none',
   })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const isValid = form.title.trim().length > 0 && Boolean(form.priority)
+
   async function save() {
+    if (!form.title.trim()) {
+      toast.error('Task title is required')
+      return
+    }
+    if (!form.priority) {
+      toast.error('Priority is required')
+      return
+    }
     setBusy(true)
     try {
-      const body = { ...form, dueDate: form.dueDate || undefined }
+      const body = {
+        ...form,
+        title: form.title.trim(),
+        dueDate: form.dueDate || undefined,
+        dueTime: form.dueTime || undefined,
+      }
       if (isNew) await tasksApi.create(body); else await tasksApi.update(task._id, body)
       toast.success(isNew ? 'Task added' : 'Task updated'); onDone()
     } catch (err) { toast.error(err.response?.data?.message || 'Failed') } finally { setBusy(false) }
   }
   return (
-    <Modal open onClose={onClose} title={isNew ? 'Add Task' : 'Edit Task'} footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy || form.title.trim().length < 1}>{isNew ? 'Add' : 'Save'}</Button></>}>
+    <Modal
+      open
+      onClose={onClose}
+      title={isNew ? 'Add Task' : 'Edit Task'}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={busy || !isValid}>
+            {isNew ? 'Add' : 'Save'}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
-        <Input label="Task Title" value={form.title} onChange={set('title')} />
+        <Input
+          label={<span>Task Title <span className="text-red-500">*</span></span>}
+          placeholder="Enter task title"
+          value={form.title}
+          onChange={set('title')}
+          required
+        />
         <Textarea label="Description (optional)" value={form.description} onChange={set('description')} />
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="Due Date" type="date" value={form.dueDate} onChange={set('dueDate')} />
           <Input label="Due Time" type="time" value={form.dueTime} onChange={set('dueTime')} />
-          <Select label="Priority" value={form.priority} onChange={set('priority')}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></Select>
-          <Select label="Related To (optional)" value={form.relatedType} onChange={set('relatedType')}><option value="none">None</option><option value="lead">Lead</option><option value="customer">Customer</option><option value="booking">Booking</option></Select>
+          <Select
+            label={<span>Priority <span className="text-red-500">*</span></span>}
+            value={form.priority}
+            onChange={set('priority')}
+            required
+          >
+            <option value="">Select Priority</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </Select>
+          <Select label="Related To (optional)" value={form.relatedType} onChange={set('relatedType')}>
+            <option value="none">None</option>
+            <option value="lead">Lead</option>
+            <option value="customer">Customer</option>
+            <option value="booking">Booking</option>
+          </Select>
         </div>
       </div>
     </Modal>
