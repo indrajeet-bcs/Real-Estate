@@ -17,6 +17,8 @@ app.set('trust proxy', 1)
 // ---------------------------------------------------------------------------
 const CORS_ALLOWED_ORIGINS = new Set([
   'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5000',
   'http://localhost:5001',
   'https://real-estate-1-4d6s.onrender.com',
   'https://real-estate-frontend-5hm9.onrender.com',
@@ -27,6 +29,7 @@ const CORS_ALLOWED_ORIGINS = new Set([
 function isOriginAllowed(origin) {
   if (!origin) return true                                    // server-to-server, curl
   if (CORS_ALLOWED_ORIGINS.has(origin)) return true          // exact allowlist match
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true // any local dev port (5173, 5174, etc.)
   if (/^https:\/\/[a-z0-9-]+\.onrender\.com$/i.test(origin)) return true   // any *.onrender.com
   if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return true     // any *.vercel.app
   return false

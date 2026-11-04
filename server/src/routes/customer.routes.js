@@ -3,6 +3,8 @@ import * as ctrl from '../controllers/customer.controller.js'
 import { authenticate } from '../middleware/auth.js'
 import { requirePermission } from '../middleware/rbac.js'
 import { requireRole } from '../middleware/rbac.js'
+import { ApiError } from '../utils/ApiError.js'
+import { can } from '../config/permissions.js'
 import { validate } from '../middleware/validate.js'
 import { upload } from '../middleware/upload.js'
 import { MODULES, ROLES } from '../config/constants.js'
@@ -55,7 +57,17 @@ router.post(
 
 router.get('/', validate(listCustomersSchema, 'query'), requirePermission(MODULES.CUSTOMER, 'view'), ctrl.listCustomers)
 router.get('/:id', requirePermission(MODULES.CUSTOMER, 'view'), ctrl.getCustomer)
-router.post('/', validate(createCustomerSchema), requirePermission(MODULES.LEAD, 'create'), ctrl.createCustomer)
+router.post(
+  '/',
+  validate(createCustomerSchema),
+  (req, res, next) => {
+    if (can(req.user, MODULES.CUSTOMER, 'create') || can(req.user, MODULES.LEAD, 'create')) {
+      return next()
+    }
+    return next(ApiError.forbidden('Not permitted to create customer'))
+  },
+  ctrl.createCustomer
+)
 router.patch('/:id', validate(updateCustomerSchema), requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.updateCustomer)
 
 router.post('/:id/notes', validate(addNoteSchema), requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.addNote)

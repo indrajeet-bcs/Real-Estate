@@ -8,7 +8,7 @@ import { formatDate, formatMoney, titleCase } from '../../lib/format.js'
 import {
   Card, Button, Input, Select, Textarea, Table, StatusBadge, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
-import { TransferBookingModal } from './AdminBookingsPage.jsx'
+import { TransferBookingModal, RejectBookingModal } from './AdminBookingsPage.jsx'
 
 const money = (n) => formatMoney(n ?? 0)
 
@@ -89,12 +89,22 @@ export default function BookingDetailsPage() {
   return (
     <div className="print:bg-white">
       <div className="mb-4 flex items-center justify-between print:hidden">
-        <button onClick={() => navigate(-1)} className="text-sm text-slate-500 hover:text-slate-700">← Back</button>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-blue-600 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-[0.98]"
+          title="Back to previous page"
+        >
+          <span className="material-symbols-outlined text-[19px] text-slate-400 transition-all duration-200 group-hover:-translate-x-1 group-hover:text-blue-600">
+            arrow_back
+          </span>
+          <span>Back</span>
+        </button>
         <div className="flex flex-wrap items-center gap-2">
           {editable && booking.status === 'reserved' && (
             <>
               <Button size="sm" variant="success" onClick={() => setStatus('confirmed')}>Confirm Booking</Button>
-              <Button size="sm" variant="danger" onClick={() => { const r = window.prompt('Cancellation reason?'); if (r != null) setStatus('cancelled', r) }}>Cancel Booking</Button>
+              <Button size="sm" variant="danger" onClick={() => setModal('reject')}>Reject / Cancel Reservation</Button>
             </>
           )}
           {editable && <Button size="sm" variant="secondary" onClick={() => setModal('edit')}>Edit Booking</Button>}
@@ -327,6 +337,7 @@ export default function BookingDetailsPage() {
       {modal === 'registration' && <RegistrationModal booking={booking} onClose={close} onDone={done} />}
       {modal === 'edit' && <EditModal booking={booking} onClose={close} onDone={done} />}
       {modal === 'transfer' && <TransferBookingModal booking={booking} execs={execs || []} onClose={close} onDone={done} />}
+      {modal === 'reject' && <RejectBookingModal booking={booking} onClose={close} onDone={done} />}
     </div>
   )
 }

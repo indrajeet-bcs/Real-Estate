@@ -82,40 +82,34 @@ export function ExportMenu({ items = [], label = 'Export', disabled = false, loa
 
 // --- Inputs ---
 const fieldCls =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500'
+  'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 shadow-xs outline-none transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/50 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400'
 
-preeti
 export function renderFieldLabel(label, required) {
   if (!label) return null
   const isReq = Boolean(required || (typeof label === 'string' && (/\*\s*$/.test(label) || /\s+\*\s*/.test(label))))
   const cleanLabel = typeof label === 'string' ? label.replace(/\s*\*+\s*$/, '') : label
 
   return (
-    <span className="mb-1 block text-sm font-medium text-slate-700">
+    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
       {cleanLabel}
       {isReq && <span className="ml-1 font-bold text-red-500" title="Mandatory field">*</span>}
     </span>
   )
 }
 
-export function Input({ label, error, required, className = '', ...props }) {
-  const isRequired = required || props.required
-  return (
-    <label className="block">
-      {renderFieldLabel(label, isRequired)}
-      <input required={isRequired} className={`${fieldCls} ${className}`} {...props} />
-
-export function Input({ label, error, className = '', type, ...props }) {
+export function Input({ label, error, required, className = '', type, ...props }) {
   const [showPassword, setShowPassword] = useState(false)
   const isPassword = type === 'password'
   const inputType = isPassword ? (showPassword ? 'text' : 'password') : type
+  const isRequired = required || props.required
 
   return (
     <label className="block">
-      {label && <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>}
+      {renderFieldLabel(label, isRequired)}
       <div className="relative">
         <input
           type={inputType}
+          required={isRequired}
           className={`${fieldCls} ${isPassword ? 'pr-10' : ''} ${className}`}
           {...props}
         />
@@ -145,7 +139,6 @@ export function Input({ label, error, className = '', type, ...props }) {
           </button>
         )}
       </div>
- main
       {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
     </label>
   )
@@ -161,14 +154,25 @@ export function Textarea({ label, required, className = '', ...props }) {
   )
 }
 
-export function Select({ label, children, required, className = '', ...props }) {
+export function Select({ label, children, required, className = '', containerClassName = '', ...props }) {
   const isRequired = required || props.required
   return (
-    <label className="block">
+    <label className={`block ${containerClassName}`}>
       {renderFieldLabel(label, isRequired)}
-      <select required={isRequired} className={`${fieldCls} ${className}`} {...props}>
-        {children}
-      </select>
+      <div className="relative">
+        <select
+          required={isRequired}
+          className={`w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3.5 pr-9 py-2 text-sm text-slate-800 shadow-xs outline-none transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/50 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${className}`}
+          {...props}
+        >
+          {children}
+        </select>
+        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition-colors">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </span>
+      </div>
     </label>
   )
 }
@@ -190,12 +194,11 @@ export function PageHeader({ title, subtitle, actions }) {
   )
 }
 
-export function StatCard({ label, value, hint, onClick, className = '' }) {
+export function StatCard({ label, value, hint, onClick, className = '', type, ...props }) {
   return (
     <Card
-      className={`p-5 transition-all ${
-        onClick ? 'cursor-pointer hover:border-blue-500 hover:shadow-md hover:-translate-y-0.5' : ''
-      } ${className}`}
+      className={`p-5 transition-all ${onClick ? 'cursor-pointer hover:border-blue-500 hover:shadow-md hover:-translate-y-0.5' : ''
+        } ${className}`}
       onClick={onClick}
     >
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>

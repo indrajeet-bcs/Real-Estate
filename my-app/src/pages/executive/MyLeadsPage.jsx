@@ -74,6 +74,8 @@ export default function MyLeadsPage() {
   // modal targets
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [previewFor, setPreviewFor] = useState(null)
+  const [callModalFor, setCallModalFor] = useState(null)
   const [followUpFor, setFollowUpFor] = useState(null)
   const [visitFor, setVisitFor] = useState(null)
   const [convertFor, setConvertFor] = useState(null)
@@ -155,8 +157,35 @@ export default function MyLeadsPage() {
   }
 
   function call(r) {
-    // Best-effort dialer; on desktop this is a no-op beyond the toast.
-    window.location.href = `tel:${(r.mobile || '').replace(/\s/g, '')}`
+    if (!r) return
+    const rawNumber = String(r.mobile || r.phone || '').trim()
+    const cleanNumber = rawNumber.replace(/[^\d+]/g, '')
+    if (!cleanNumber) {
+      toast.error(`No phone number available for ${r.name || 'this lead'}.`)
+      return
+    }
+
+    // Auto-copy to clipboard for easy pasting into desktop VoIP/softphone apps
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(cleanNumber).catch(() => {})
+    }
+
+    // Trigger standard tel: protocol handler
+    try {
+      const a = document.createElement('a')
+      a.href = `tel:${cleanNumber}`
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => {
+        try { document.body.removeChild(a) } catch (_) {}
+      }, 100)
+    } catch (_) {
+      window.location.href = `tel:${cleanNumber}`
+    }
+
+    toast.info(`Dialing ${cleanNumber} (${r.name}). Number copied to clipboard!`)
+    setCallModalFor(r)
   }
 
   const refetchAll = () => { refetch(); refetchReq() }
@@ -164,7 +193,15 @@ export default function MyLeadsPage() {
   const columns = [
     { key: 'name', header: 'Lead', render: (r) => (
       <div className="min-w-[9rem]">
-        <div className="font-medium text-slate-900">{r.name}</div>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); navigate(`/executive/leads/${r._id}`) }}
+          className="group flex items-center gap-1 text-left font-semibold text-slate-900 hover:text-blue-600 hover:underline cursor-pointer"
+          title="Open Full Profile"
+        >
+          <span>{r.name}</span>
+          <span className="material-symbols-outlined text-[13px] opacity-0 group-hover:opacity-100 transition-opacity text-blue-600">open_in_new</span>
+        </button>
         <div className="text-xs text-slate-500">{r.mobile}</div>
         {pendingByCustomer[String(r._id)] && <span className="mt-0.5 inline-block rounded bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">Transfer pending</span>}
       </div>
@@ -194,7 +231,7 @@ export default function MyLeadsPage() {
     { key: 'priority', header: 'Priority', render: (r) => <span className={`rounded border px-2 py-0.5 text-xs font-medium ${PRIORITY_CLS[r.priority || 'medium']}`}>{titleCase(r.priority || 'medium')}</span> },
     { key: 'actions', header: '', render: (r) => (
       <div className="flex items-center justify-end gap-1.5">
-        <IconBtn title="View" icon={ICONS.eye} onClick={(e) => { e.stopPropagation(); navigate(`/executive/leads/${r._id}`) }} />
+        <IconBtn title="Quick Summary Preview" icon={ICONS.eye} onClick={(e) => { e.stopPropagation(); setPreviewFor(r) }} />
         <IconBtn title="Call" icon={ICONS.phone} onClick={(e) => { e.stopPropagation(); call(r) }} />
         <IconBtn title="Actions" icon={ICONS.kebab} onClick={(e) => { e.stopPropagation(); setSheetFor(r) }} />
       </div>
@@ -302,11 +339,33 @@ export default function MyLeadsPage() {
       {visitFor && <ScheduleVisitModal lead={visitFor} projects={projects || []} onClose={() => setVisitFor(null)} onDone={() => { setVisitFor(null); refetch() }} />}
       {convertFor && <ConvertModal lead={convertFor} onClose={() => setConvertFor(null)} onDone={() => { setConvertFor(null); refetch() }} />}
       {transferFor && <RequestTransferModal lead={transferFor} onClose={() => setTransferFor(null)} onDone={() => { setTransferFor(null); refetchAll() }} />}
+      {previewFor && (
+        <LeadSummaryModal
+          lead={previewFor}
+          projects={projects || []}
+          onClose={() => setPreviewFor(null)}
+          onViewProfile={() => { const id = previewFor._id; setPreviewFor(null); navigate(`/executive/leads/${id}`) }}
+          onCall={() => { const l = previewFor; setPreviewFor(null); call(l) }}
+          onFollowUp={() => { const l = previewFor; setPreviewFor(null); setFollowUpFor(l) }}
+          onVisit={() => { const l = previewFor; setPreviewFor(null); setVisitFor(l) }}
+          onConvert={() => { const l = previewFor; setPreviewFor(null); setConvertFor(l) }}
+        />
+      )}
+      {callModalFor && (
+        <CallModal
+          record={callModalFor}
+          entityLabel="Lead"
+          onClose={() => setCallModalFor(null)}
+          onFollowUp={(l) => { setCallModalFor(null); setFollowUpFor(l) }}
+        />
+      )}
       {sheetFor && (
         <ActionSheet
           lead={sheetFor}
           hasPendingTransfer={pendingByCustomer[String(sheetFor._id)]}
           onClose={() => setSheetFor(null)}
+          onCall={() => { const r = sheetFor; setSheetFor(null); call(r) }}
+          onPreview={() => { const r = sheetFor; setSheetFor(null); setPreviewFor(r) }}
           onView={() => { const r = sheetFor; setSheetFor(null); navigate(`/executive/leads/${r._id}`) }}
           onEdit={() => { setEditing(sheetFor); setSheetFor(null) }}
           onFollowUp={() => { setFollowUpFor(sheetFor); setSheetFor(null) }}
@@ -319,33 +378,241 @@ export default function MyLeadsPage() {
   )
 }
 
+// ─── Lead Summary Modal (Quick in-place preview) ─────────────────────────────
+function LeadSummaryModal({ lead, projects = [], onClose, onViewProfile, onCall, onFollowUp, onVisit, onConvert }) {
+  const projectName = useMemo(() => {
+    const m = {}
+    projects.forEach((p) => { m[String(p._id)] = p.name })
+    return m
+  }, [projects])
+
+  const projectTitle = useMemo(() => {
+    const first = lead.interestedProjects?.[0]
+    if (!first) return 'Not specified'
+    const id = first.project?._id || first.project
+    return first.project?.name || projectName[String(id)] || 'Not specified'
+  }, [lead, projectName])
+
+  const canConvert = lead.status === 'qualified'
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      wide
+      title={
+        <div className="flex items-center justify-between gap-3 pr-6">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700 font-bold text-base">
+              {(lead.name || 'L').charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-slate-900">{lead.name}</span>
+                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 border border-blue-200">
+                  Lead Summary Preview
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                {lead.mobile} {lead.email ? `• ${lead.email}` : ''}
+              </p>
+            </div>
+          </div>
+        </div>
+      }
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onCall}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px] text-emerald-600">call</span>
+              <span>Call</span>
+            </button>
+            {onFollowUp && (
+              <Button size="sm" variant="secondary" onClick={onFollowUp}>
+                + Follow-up
+              </Button>
+            )}
+            {canConvert && onConvert && (
+              <Button size="sm" variant="secondary" onClick={onConvert}>
+                Convert
+              </Button>
+            )}
+            <Button size="sm" onClick={onViewProfile} className="gap-1.5">
+              <span>View Full Profile</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-4 py-1">
+        {/* Key Metrics / Snapshot Grid */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Stage</div>
+            <div className="mt-1 font-semibold text-xs text-slate-900">
+              {stageLabel(lead.status)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Priority</div>
+            <div className="mt-1">
+              <span className={`rounded border px-2 py-0.5 text-xs font-medium ${PRIORITY_CLS[lead.priority || 'medium']}`}>
+                {titleCase(lead.priority || 'medium')}
+              </span>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Budget Range</div>
+            <div className="mt-1 font-semibold text-xs text-slate-900 truncate">
+              {lead.budgetMin || lead.budgetMax
+                ? `${inr(lead.budgetMin)} - ${inr(lead.budgetMax)}`
+                : 'Not specified'}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Source</div>
+            <div className="mt-1 font-semibold text-xs text-slate-900">
+              {titleCase(lead.source || '—')}
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Property & Preference Information */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-blue-600">home_work</span>
+            Interest & Requirements
+          </h4>
+          <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
+            <div>
+              <dt className="text-slate-500">Interested Project:</dt>
+              <dd className="font-semibold text-slate-900 mt-0.5">{projectTitle}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Configuration:</dt>
+              <dd className="font-semibold text-slate-900 mt-0.5">{lead.configuration || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Property Type:</dt>
+              <dd className="font-semibold text-slate-900 mt-0.5">{titleCase(lead.propertyType || '—')}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">City / Location:</dt>
+              <dd className="font-semibold text-slate-900 mt-0.5">{lead.city || lead.address || '—'}</dd>
+            </div>
+          </dl>
+        </div>
+
+        {/* Notes & Follow-up Section */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+          <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-blue-600">history_edu</span>
+            Engagement & Remarks
+          </h4>
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+              <span className="text-slate-500">Next Follow-up Due:</span>
+              <span className="font-medium text-slate-800">
+                {lead.nextFollowUp ? formatDate(lead.nextFollowUp, true) : 'None scheduled'}
+              </span>
+            </div>
+            <div>
+              <span className="block text-slate-500 mb-1">Lead Notes & Remarks:</span>
+              <p className="rounded-lg border border-slate-200 bg-white p-2.5 text-slate-700 italic">
+                {lead.requirements || lead.notes || lead.note || 'No specific notes recorded.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── Per-row action sheet (spec §Leads Table · Actions) ─────────────────────────
-function ActionSheet({ lead, hasPendingTransfer, onClose, onView, onEdit, onFollowUp, onVisit, onConvert, onTransfer }) {
+function ActionSheet({ lead, hasPendingTransfer, onClose, onCall, onPreview, onView, onEdit, onFollowUp, onVisit, onConvert, onTransfer }) {
   const canConvert = lead.status === 'qualified'
   const actions = [
-    { label: 'View Details', icon: '👤', onClick: onView },
-    { label: 'Edit Lead', icon: '✏️', onClick: onEdit },
-    { label: 'Schedule Follow-up', icon: '↻', onClick: onFollowUp },
-    { label: 'Schedule Site Visit', icon: '⌖', onClick: onVisit },
-    { label: canConvert ? 'Convert to Customer' : 'Convert to Customer (qualified only)', icon: '✓', onClick: onConvert, disabled: !canConvert },
-    { label: hasPendingTransfer ? 'Transfer request pending' : 'Request Lead Transfer', icon: '⇄', onClick: onTransfer, disabled: hasPendingTransfer },
+    {
+      label: `Call ${lead.name}`,
+      icon: 'call',
+      description: lead.mobile ? `Dial ${lead.mobile} or open quick dialer` : 'No phone number available',
+      onClick: onCall,
+      disabled: !lead.mobile,
+    },
+    {
+      label: 'View Full Profile',
+      icon: 'open_in_new',
+      description: 'Open complete lead profile, activity & interaction history',
+      onClick: onView,
+    },
+    {
+      label: 'Quick Summary Preview',
+      icon: 'visibility',
+      description: 'Quick snapshot of contact details, budget & preferences',
+      onClick: onPreview,
+    },
+    {
+      label: 'Edit Lead',
+      icon: 'edit',
+      description: 'Update lead contact info, budget, project & stage',
+      onClick: onEdit,
+    },
+    {
+      label: 'Schedule Follow-up',
+      icon: 'add_call',
+      description: 'Schedule a call or follow-up task',
+      onClick: onFollowUp,
+    },
+    {
+      label: 'Schedule Site Visit',
+      icon: 'location_on',
+      description: 'Book an on-site project walkthrough',
+      onClick: onVisit,
+    },
+    {
+      label: canConvert ? 'Convert to Customer' : 'Convert to Customer (qualified only)',
+      icon: 'check_circle',
+      description: canConvert ? 'Promote lead to an active buyer/customer' : 'Lead must be in qualified stage first',
+      onClick: onConvert,
+      disabled: !canConvert,
+    },
+    {
+      label: hasPendingTransfer ? 'Transfer request pending' : 'Request Lead Transfer',
+      icon: 'swap_horiz',
+      description: hasPendingTransfer ? 'Transfer request is awaiting admin approval' : 'Request reassignment to another sales executive',
+      onClick: onTransfer,
+      disabled: hasPendingTransfer,
+    },
   ]
   return (
     <Modal open onClose={onClose} title={lead.name}
       footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
     >
-      <p className="mb-3 text-xs text-slate-500">{lead.mobile} · {stageLabel(lead.status)}</p>
-      <div className="grid grid-cols-1 gap-2">
+      <p className="mb-3.5 text-xs text-slate-500">{lead.mobile} · {stageLabel(lead.status)}</p>
+      <div className="grid grid-cols-1 gap-2.5">
         {actions.map((a) => (
           <button
             key={a.label}
             onClick={a.onClick}
             disabled={a.disabled}
-            className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${
-              a.disabled ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400' : 'border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+            className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+              a.disabled
+                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
+                : 'border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 cursor-pointer'
             }`}
           >
-            <span className="text-base">{a.icon}</span> {a.label}
+            <span className="material-symbols-outlined text-[20px] text-blue-600 mt-0.5">{a.icon}</span>
+            <div>
+              <div className="text-sm font-semibold text-slate-800">{a.label}</div>
+              {a.description && <div className="text-xs text-slate-500 mt-0.5">{a.description}</div>}
+            </div>
           </button>
         ))}
       </div>
@@ -667,6 +934,118 @@ export function RequestTransferModal({ lead, entityLabel = 'Lead', onClose, onDo
           <textarea rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Add any context for the approver…"
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
         </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Call / Quick Dialer Modal ────────────────────────────────────────────────
+function CallModal({ record, entityLabel = 'Lead', onClose, onFollowUp }) {
+  const [copied, setCopied] = useState(false)
+  const rawNumber = String(record?.mobile || record?.phone || '').trim()
+  const cleanNumber = rawNumber.replace(/[^\d+]/g, '')
+  const waNumber = cleanNumber.replace(/^\+/, '')
+
+  const handleCopy = () => {
+    if (navigator?.clipboard?.writeText && cleanNumber) {
+      navigator.clipboard.writeText(cleanNumber)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const handleDial = () => {
+    if (!cleanNumber) return
+    const a = document.createElement('a')
+    a.href = `tel:${cleanNumber}`
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    setTimeout(() => {
+      try { document.body.removeChild(a) } catch (_) {}
+    }, 100)
+  }
+
+  const handleWhatsApp = () => {
+    if (!waNumber) return
+    window.open(`https://wa.me/${waNumber}`, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-[22px] text-emerald-600">call</span>
+          <span>Call {entityLabel}: {record?.name}</span>
+        </div>
+      }
+      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
+    >
+      <div className="space-y-4 py-2">
+        {/* Phone Number Display Box */}
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wider text-slate-500">Phone Number</div>
+            <div className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 font-mono">
+              {rawNumber || 'No number specified'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!cleanNumber}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-blue-600 transition disabled:opacity-50 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px] text-slate-500">
+              {copied ? 'check' : 'content_copy'}
+            </span>
+            <span>{copied ? 'Copied!' : 'Copy'}</span>
+          </button>
+        </div>
+
+        {/* Action Buttons Grid */}
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={handleDial}
+            disabled={!cleanNumber}
+            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-xs hover:bg-emerald-700 active:scale-[0.99] transition disabled:opacity-50 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[18px]">call</span>
+            <span>Open Phone Dialer</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleWhatsApp}
+            disabled={!cleanNumber}
+            className="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-100/70 transition disabled:opacity-50 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[18px] text-emerald-600">chat</span>
+            <span>Open WhatsApp</span>
+          </button>
+        </div>
+
+        {/* Quick follow-up / call note prompt */}
+        {onFollowUp && (
+          <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold text-blue-900">Finished the call?</div>
+              <div className="text-[11px] text-blue-700 mt-0.5">Log notes or schedule your next follow-up.</div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                onClose()
+                onFollowUp(record)
+              }}
+            >
+              + Log Follow-up
+            </Button>
+          </div>
+        )}
       </div>
     </Modal>
   )

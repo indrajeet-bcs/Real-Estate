@@ -244,7 +244,17 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
   const { status, cancelReason } = req.body
   const prev = booking.status
   booking.status = status
-  if (status === BOOKING_STATUS.CANCELLED) booking.cancelReason = cancelReason
+  if (status === BOOKING_STATUS.CANCELLED) {
+    if (!cancelReason || typeof cancelReason !== 'string' || !cancelReason.trim()) {
+      throw ApiError.badRequest('A reason or remark is mandatory for rejecting or cancelling a booking reservation')
+    }
+    booking.cancelReason = cancelReason.trim()
+    booking.timeline.push({ type: 'cancelled', note: `Reservation rejected: ${booking.cancelReason}` })
+    await Customer.updateOne(
+      { _id: booking.customer },
+      { $push: { activity: { action: 'booking_cancelled', description: `Reservation rejected: ${booking.cancelReason}`, actor: req.user._id, at: new Date() } } }
+    )
+  }
   await booking.save()
 
   // Reflect the change on the unit + customer.
@@ -435,8 +445,11 @@ export const decideDiscountRequest = asyncHandler(async (req, res) => {
     })
     booking.timeline.push({ type: 'discount_approved', note: `Discount of ₹${dr.totalDiscount} approved` })
   } else {
+    if (!note || typeof note !== 'string' || !note.trim()) {
+      throw ApiError.badRequest('A reason or remark is mandatory when rejecting a discount request')
+    }
     dr.status = 'rejected'
-    booking.timeline.push({ type: 'discount_rejected', note: 'Discount request rejected' })
+    booking.timeline.push({ type: 'discount_rejected', note: `Discount request rejected: ${note.trim()}` })
   }
   await booking.save()
 
@@ -488,8 +501,11 @@ export const decideCancellation = asyncHandler(async (req, res) => {
     customer?.logActivity('booking_cancelled', `Booking cancelled: ${cr.reason}`, req.user._id)
     await customer?.save()
   } else {
+    if (!note || typeof note !== 'string' || !note.trim()) {
+      throw ApiError.badRequest('A reason or remark is mandatory when rejecting a cancellation request')
+    }
     cr.status = 'rejected'
-    booking.timeline.push({ type: 'cancellation_rejected', note: 'Cancellation request rejected' })
+    booking.timeline.push({ type: 'cancellation_rejected', note: `Cancellation request rejected: ${note.trim()}` })
   }
   await booking.save()
 

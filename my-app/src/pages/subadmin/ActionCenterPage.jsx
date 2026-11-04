@@ -4,6 +4,7 @@ import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate, titleCase, formatMoney } from '../../lib/format.js'
 import { PageHeader, Card, Button, Input, Table, StatusBadge, Loader } from '../../components/ui.jsx'
+import { RejectBookingModal } from '../admin/AdminBookingsPage.jsx'
 
 const shortId = (id) => `#${String(id || '').slice(-6).toUpperCase()}`
 
@@ -97,6 +98,7 @@ function EmptyTab({ title, note }) {
 // Bookings — financial: no bulk actions (spec).
 function BookingsTab({ q, search }) {
   const toast = useToast()
+  const [rejectingBooking, setRejectingBooking] = useState(null)
   const rows = filterRows(q.data || [], search, (r) => [r.customer?.name, r.project?.name, r.unit?.unitNumber, r.bookedBy?.name])
   const setStatus = async (b, status, reason) => {
     try { await bookingsApi.setStatus(b._id, { status, cancelReason: reason }); toast.success(`Booking ${status}`); q.refetch() }
@@ -113,11 +115,22 @@ function BookingsTab({ q, search }) {
     { key: 'actions', header: '', render: (r) => (
       <div className="flex gap-2">
         <Button size="sm" variant="success" onClick={() => setStatus(r, 'confirmed')}>Verify &amp; Confirm</Button>
-        <Button size="sm" variant="danger" onClick={() => { const rm = promptRemarks('Reject booking'); if (rm) setStatus(r, 'cancelled', rm) }}>Reject</Button>
+        <Button size="sm" variant="danger" onClick={() => setRejectingBooking(r)}>Reject</Button>
       </div>
     ) },
   ]
-  return <Card className="p-5">{q.loading ? <Loader /> : <Table columns={columns} rows={rows} empty="No bookings awaiting verification." />}</Card>
+  return (
+    <>
+      <Card className="p-5">{q.loading ? <Loader /> : <Table columns={columns} rows={rows} empty="No bookings awaiting verification." />}</Card>
+      {rejectingBooking && (
+        <RejectBookingModal
+          booking={rejectingBooking}
+          onClose={() => setRejectingBooking(null)}
+          onDone={() => { setRejectingBooking(null); q.refetch() }}
+        />
+      )}
+    </>
+  )
 }
 
 // Leaves — non-financial: bulk approve/reject allowed (spec §Bulk Actions).

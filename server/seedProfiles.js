@@ -16,7 +16,6 @@ const DEPTS = ['Sales', 'Sales & Leasing', 'Residential Sales']
 const AREAS = ['Baner', 'Wakad', 'Kharadi', 'Viman Nagar', 'Hinjewadi', 'Andheri', 'Powai']
 const FIRST = ['Rahul', 'Priya', 'Amit', 'Sneha', 'Karan', 'Neha', 'Vikram', 'Pooja', 'Rohit', 'Anjali']
 const LAST = ['Sharma', 'Verma', 'Patel', 'Gupta', 'Mehta', 'Nair', 'Reddy', 'Joshi']
-
 async function seed() {
   try {
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/real-estate-crm')
@@ -48,7 +47,7 @@ async function seed() {
         if (!e.passwordChangedAt) { e.passwordChangedAt = e.joiningDate; touched = true }
         if (!e.lastLoginDevice) { e.lastLoginDevice = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120'; touched = true }
         if (!e.preferences || !e.preferences.language) { e.preferences = { language: 'en', timeFormat: pick(['12h', '24h']), dateFormat: 'DD MMM YYYY' }; touched = true }
-
+  
         if (touched) { await e.save(); updated++; n++ }
       }
       console.log(`- ${firm.name}: ${n} executive profile(s) enriched`)
