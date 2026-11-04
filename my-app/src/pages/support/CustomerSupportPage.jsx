@@ -1,7 +1,9 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader, Card, StatCard, Button, Input, Select, StatusBadge, Pagination, Loader, ErrorState } from '../../components/ui.jsx'
-import { ticketsApi } from '../../api/resources.js'
+import { ticketsApi, ticketCategoriesApi } from '../../api/resources.js'
+import { useToast } from '../../context/ToastContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import { formatDate } from '../../lib/format.js'
@@ -17,12 +19,21 @@ const priorityCls = (p) =>
   p === 'Critical' ? 'bg-red-100 text-red-700' : p === 'High' ? 'bg-orange-100 text-orange-700' : p === 'Medium' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
 
 export default function CustomerSupportPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+
   const [searchParams, setSearchParams] = useSearchParams()
-  const TABS = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'tickets', label: 'Support Tickets' },
-    { key: 'reports', label: 'Reports' },
-  ]
+  const TABS = useMemo(() => {
+    const list = [
+      { key: 'dashboard', label: 'Dashboard' },
+      { key: 'tickets', label: 'Support Tickets' },
+      { key: 'reports', label: 'Reports' },
+    ]
+    if (isAdmin) {
+      list.splice(2, 0, { key: 'categories', label: 'Ticket Categories' })
+    }
+    return list
+  }, [isAdmin])
   const tabParam = searchParams.get('tab')
   const tab = TABS.some((t) => t.key === tabParam) ? tabParam : 'dashboard'
   const setTab = (t) => setSearchParams((p) => { p.set('tab', t); return p }, { replace: true })
@@ -75,6 +86,7 @@ export default function CustomerSupportPage() {
           onPage={setPage} onPageSize={(n) => { setLimit(n); setPage(1) }}
         />
       )}
+      {tab === 'categories' && isAdmin && <CategoriesTab />}
       {tab === 'reports' && <ReportsTab tickets={tickets} kpis={kpis} />}
 
       {adding && <CreateTicketModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); onChanged() }} />}
@@ -224,6 +236,172 @@ function ReportsTab({ tickets, kpis }) {
           })}
         </div>
       </Card>
+    </div>
+  )
+}
+
+
+function CategoriesTab() {
+  const toast = useToast()
+  const { data, loading, error, refetch } = useFetch(useCallback(() => ticketCategoriesApi.list(), []))
+  const [modal, setModal] = useState(null)
+  const [targetCat, setTargetCat] = useState(null)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const openAdd = () => {
+    setTargetCat(null)
+    setName('')
+    setModal('add')
+  }
+
+  const openEdit = (cat) => {
+    setTargetCat(cat)
+    setName(cat.name)
+    setModal('edit')
+  }
+
+  const handleSave = async (e) => {
+    e?.preventDefault()
+    if (!name.trim()) {
+      toast.error('Category name is required')
+      return
+    }
+    setBusy(true)
+    try {
+      if (modal === 'add') {
+        await ticketCategoriesApi.create({ name: name.trim() })
+        toast.success('Category created successfully')
+      } else {
+        await ticketCategoriesApi.update(targetCat._id, { name: name.trim() })
+        toast.success('Category updated successfully')
+      }
+      setModal(null)
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save category')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleToggle = async (cat) => {
+    try {
+      await ticketCategoriesApi.toggle(cat._id, !cat.isActive)
+      toast.success(cat.isActive ? 'Category deactivated' : 'Category activated')
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to toggle category')
+    }
+  }
+
+  const handleDelete = async (cat) => {
+    if (!window.confirm(`Are you sure you want to delete category "${cat.name}"?`)) return
+    try {
+      await ticketCategoriesApi.remove(cat._id)
+      toast.success('Category deleted')
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not delete category')
+    }
+  }
+
+  const categories = data || []
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">Support Ticket Categories</h3>
+          <p className="text-xs text-slate-500">Categories created here will be automatically available to all Sub-Admins and Sales Executives when filing tickets.</p>
+        </div>
+        <Button onClick={openAdd}>+ Add Category</Button>
+      </div>
+
+      {loading ? (
+        <Loader />
+      ) : error ? (
+        <ErrorState message={error} onRetry={refetch} />
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                <tr>
+                  <th className="px-6 py-3">Category Name</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Created On</th>
+                  <th className="px-6 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {categories.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-10 text-center text-sm text-slate-500">
+                      No categories defined yet. Click "+ Add Category" to create your first category.
+                    </td>
+                  </tr>
+                ) : (
+                  categories.map((cat) => (
+                    <tr key={cat._id} className="hover:bg-slate-50/50">
+                      <td className="px-6 py-4 font-medium text-slate-900">{cat.name}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${cat.isActive !== false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-600'}`}>
+                          {cat.isActive !== false ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-500">{formatDate(cat.createdAt)}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => handleToggle(cat)}>
+                            {cat.isActive !== false ? 'Deactivate' : 'Activate'}
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => openEdit(cat)}>
+                            Edit
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => handleDelete(cat)}>
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-md overflow-hidden bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 className="text-base font-semibold text-slate-900">
+                {modal === 'add' ? 'Add Ticket Category' : 'Edit Ticket Category'}
+              </h3>
+              <button onClick={() => setModal(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              <Input
+                label="Category Name *"
+                placeholder="e.g. Payment Issue, Site Visit, Legal Document"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoFocus
+              />
+              <p className="text-xs text-slate-500">
+                This category will immediately become available in the category dropdown for Sub-Admins and Sales Executives.
+              </p>
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <Button variant="secondary" type="button" onClick={() => setModal(null)} disabled={busy}>Cancel</Button>
+                <Button type="submit" loading={busy}>{modal === 'add' ? 'Create Category' : 'Save Changes'}</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
