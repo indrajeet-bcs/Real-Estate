@@ -286,17 +286,6 @@ function RosterTab() {
           </p>
         </Modal>
       )}
-
- preeti
-      {transferFor && <TransferModal user={transferFor} branches={branches || []} subAdmins={subAdmins || []} onClose={() => setTransferFor(null)} onDone={() => { setTransferFor(null); refetch() }} />}
-      {editFor && (
-        <UserRegistrationModal
-          open={!!editFor}
-          user={editFor}
-          branches={branches || []}
-          allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
-          defaultRole={editFor.role || 'sales_executive'}
-          
       {transferFor && (
         <TransferModal
           user={transferFor}
@@ -307,33 +296,26 @@ function RosterTab() {
         />
       )}
       {editFor && (
-        <EmployeeModal
+        <UserRegistrationModal
+          open={!!editFor}
           user={editFor}
           branches={branches || []}
-          subAdmins={subAdmins || []}
- main
+          allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
+          defaultRole={editFor.role || 'sales_executive'}
           onClose={() => setEditFor(null)}
           onDone={() => { setEditFor(null); refetch() }}
         />
       )}
       {showCreate && (
- preeti
         <UserRegistrationModal
           open={showCreate}
           branches={branches || []}
           allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
           defaultRole="sales_executive"
-
-        <EmployeeModal
-          branches={branches || []}
-          subAdmins={subAdmins || []}
-main
           onClose={() => setShowCreate(false)}
           onDone={() => { setShowCreate(false); refetch() }}
         />
       )}
- preeti
-
       {deleteFor && (
         <DeleteEmployeeModal
           user={deleteFor}
@@ -342,7 +324,6 @@ main
           onDone={() => { setDeleteFor(null); refetch() }}
         />
       )}
- main
       {showImport && <ImportModal branches={branches || []} onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); refetch() }} />}
       {historyFor && <HistoryModal user={historyFor} onClose={() => setHistoryFor(null)} />}
     </div>

@@ -6,12 +6,6 @@ const ToastContext = createContext(null)
 
 export function ToastProvider({ children }) {
   const toast = {
- preeti
-    success: (m) => push(m, 'success'),
-    error: (m) => push(m, 'error'),
-    info: (m) => push(m, 'info'),
-    addToast: (type, m) => push(m, type),
-
     success: (message, options = {}) =>
       reactToastifyToast.success(message, {
         position: 'top-center',
@@ -60,7 +54,10 @@ export function ToastProvider({ children }) {
         transition: Slide,
         ...options,
       }),
- main
+    addToast: (type, message, options = {}) => {
+      const fn = toast[type] || toast.info
+      return fn(message, options)
+    },
   }
 
   return (

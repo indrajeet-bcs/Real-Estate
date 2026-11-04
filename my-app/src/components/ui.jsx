@@ -84,7 +84,6 @@ export function ExportMenu({ items = [], label = 'Export', disabled = false, loa
 const fieldCls =
   'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500'
 
-preeti
 export function renderFieldLabel(label, required) {
   if (!label) return null
   const isReq = Boolean(required || (typeof label === 'string' && (/\*\s*$/.test(label) || /\s+\*\s*/.test(label))))
@@ -98,24 +97,19 @@ export function renderFieldLabel(label, required) {
   )
 }
 
-export function Input({ label, error, required, className = '', ...props }) {
-  const isRequired = required || props.required
-  return (
-    <label className="block">
-      {renderFieldLabel(label, isRequired)}
-      <input required={isRequired} className={`${fieldCls} ${className}`} {...props} />
-
-export function Input({ label, error, className = '', type, ...props }) {
+export function Input({ label, error, required, className = '', type, ...props }) {
   const [showPassword, setShowPassword] = useState(false)
   const isPassword = type === 'password'
   const inputType = isPassword ? (showPassword ? 'text' : 'password') : type
+  const isRequired = required || props.required
 
   return (
     <label className="block">
-      {label && <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>}
+      {renderFieldLabel(label, isRequired)}
       <div className="relative">
         <input
           type={inputType}
+          required={isRequired}
           className={`${fieldCls} ${isPassword ? 'pr-10' : ''} ${className}`}
           {...props}
         />
@@ -145,7 +139,6 @@ export function Input({ label, error, className = '', type, ...props }) {
           </button>
         )}
       </div>
- main
       {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
     </label>
   )
@@ -190,12 +183,11 @@ export function PageHeader({ title, subtitle, actions }) {
   )
 }
 
-export function StatCard({ label, value, hint, onClick, className = '' }) {
+export function StatCard({ label, value, hint, onClick, className = '', type, ...props }) {
   return (
     <Card
-      className={`p-5 transition-all ${
-        onClick ? 'cursor-pointer hover:border-blue-500 hover:shadow-md hover:-translate-y-0.5' : ''
-      } ${className}`}
+      className={`p-5 transition-all ${onClick ? 'cursor-pointer hover:border-blue-500 hover:shadow-md hover:-translate-y-0.5' : ''
+        } ${className}`}
       onClick={onClick}
     >
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
