@@ -9,7 +9,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { ok, created } from '../utils/apiResponse.js'
 import { paginate } from '../utils/paginate.js'
 import { writeAudit } from '../middleware/audit.js'
-import { notify } from '../services/notification.service.js'
+import { notify, notifyMany } from '../services/notification.service.js'
 import { AUDIT_ACTIONS, MODULES, ROLES, CUSTOMER_STATUS, NOTIFICATION_TYPES, BOOKING_STATUS, FOLLOWUP_STATUS, VISIT_STATUS } from '../config/constants.js'
 import { ownershipScope, firmScope } from '../middleware/tenantScope.js'
 
@@ -36,7 +36,10 @@ export const listCustomers = asyncHandler(async (req, res) => {
     page,
     limit,
     select: '-notes -activity -documents',
-    populate: { path: 'assignedTo', select: 'name email' },
+    populate: [
+      { path: 'assignedTo', select: 'name email branch manager' },
+      { path: 'createdBy', select: 'name email role' },
+    ],
   })
 
   // Attach last/next follow-up + latest booking status for the returned page
@@ -108,6 +111,13 @@ export const createCustomer = asyncHandler(async (req, res) => {
   // Pull transient Add-New-Lead helpers out of the persisted body (§Add New Lead).
   const { note, interestedProject, ...fields } = req.body
 
+  // Clean empty strings for optional fields so clean null/undefined is saved
+  for (const k of ['email', 'altMobile', 'address', 'occupation', 'propertyType', 'configuration', 'preferredLocation', 'source', 'priority']) {
+    if (fields[k] === '') delete fields[k]
+  }
+  if (fields.budgetMin === '' || fields.budgetMin === null) delete fields.budgetMin
+  if (fields.budgetMax === '' || fields.budgetMax === null) delete fields.budgetMax
+
   const customer = await Customer.create({
     ...fields,
     firm: req.user.firm,
@@ -122,12 +132,29 @@ export const createCustomer = asyncHandler(async (req, res) => {
   if (note && note.trim()) {
     customer.notes.push({ type: 'general', text: note.trim(), createdBy: req.user._id })
   }
-  customer.logActivity('created', `Lead created by ${req.user.name}`, req.user._id)
+  const creatorRoleLabel = req.user.role.replace(/_/g, ' ')
+  customer.logActivity('created', `Lead created by ${req.user.name} (${creatorRoleLabel})`, req.user._id)
   await customer.save()
 
-  writeAudit({ req, action: AUDIT_ACTIONS.CREATE, module: MODULES.CUSTOMER, targetId: customer._id, targetLabel: customer.name, description: `Created lead ${customer.name}` })
+  writeAudit({
+    req,
+    action: AUDIT_ACTIONS.CREATE,
+    module: MODULES.CUSTOMER,
+    targetId: customer._id,
+    targetLabel: customer.name,
+    description: `Created lead "${customer.name}" (Mobile: ${customer.mobile}, Assigned to: ${assignedTo ? req.user.name : 'Unassigned Pool'})`,
+    meta: {
+      leadName: customer.name,
+      mobile: customer.mobile,
+      assignedTo,
+      createdBy: req.user._id,
+      creatorName: req.user.name,
+      creatorRole: req.user.role,
+    },
+  })
 
-  if (assignedTo) {
+  // If assigned to another person (e.g. Sub-Admin assigning on create), notify the assignee
+  if (assignedTo && String(assignedTo) !== String(req.user._id)) {
     notify({
       firm: req.user.firm,
       recipient: assignedTo,
@@ -138,6 +165,39 @@ export const createCustomer = asyncHandler(async (req, res) => {
       entityId: customer._id,
     })
   }
+
+  // When a Sales Executive creates a lead, notify their upper hierarchy (direct Manager / Sub-Admin / Admin)
+  if (req.user.role === ROLES.SALES_EXECUTIVE) {
+    const recipients = new Set()
+    if (req.user.manager) {
+      recipients.add(String(req.user.manager))
+    }
+    const superiors = await User.find({
+      firm: req.user.firm,
+      role: { $in: [ROLES.ADMIN, ROLES.SUB_ADMIN] },
+      isActive: true,
+      _id: { $ne: req.user._id },
+    }).select('_id role branch').lean()
+
+    for (const sup of superiors) {
+      if (sup.role === ROLES.ADMIN || !req.user.branch || !sup.branch || sup.branch === req.user.branch) {
+        recipients.add(String(sup._id))
+      }
+    }
+
+    if (recipients.size > 0) {
+      await notifyMany([...recipients], {
+        firm: req.user.firm,
+        type: NOTIFICATION_TYPES.LEAD_ASSIGNED,
+        title: `New Lead Added by ${req.user.name}`,
+        message: `${req.user.name} added new lead "${customer.name}" (${customer.mobile})`,
+        entityType: 'customer',
+        entityId: customer._id,
+        priority: 'medium',
+      })
+    }
+  }
+
   return created(res, customer, 'Customer created')
 })
 
@@ -148,11 +208,140 @@ export const updateCustomer = asyncHandler(async (req, res) => {
   const customer = await Customer.findOne(filter)
   if (!customer) throw ApiError.notFound('Customer not found')
 
-  Object.assign(customer, req.body)
-  customer.logActivity('updated', `Profile updated by ${req.user.name}`, req.user._id)
+  // Check mobile duplication if mobile is being updated
+  if (req.body.mobile && req.body.mobile !== customer.mobile) {
+    const dupe = await Customer.findOne({
+      firm: req.user.firm,
+      mobile: req.body.mobile,
+      _id: { $ne: customer._id },
+    })
+    if (dupe) throw ApiError.conflict('A customer with this mobile already exists in your firm', { existingId: dupe._id })
+  }
+
+  const oldName = customer.name
+  const newName = req.body.name ? req.body.name.trim() : customer.name
+  const nameChanged = Boolean(req.body.name && newName !== oldName)
+
+  const trackedFields = [
+    { key: 'name', label: 'Name' },
+    { key: 'mobile', label: 'Mobile' },
+    { key: 'altMobile', label: 'Alternate Mobile' },
+    { key: 'email', label: 'Email' },
+    { key: 'budgetMin', label: 'Min Budget', format: (v) => v ? `₹${Number(v).toLocaleString('en-IN')}` : 'none' },
+    { key: 'budgetMax', label: 'Max Budget', format: (v) => v ? `₹${Number(v).toLocaleString('en-IN')}` : 'none' },
+    { key: 'propertyType', label: 'Property Type' },
+    { key: 'configuration', label: 'Configuration' },
+    { key: 'preferredLocation', label: 'Preferred Location' },
+    { key: 'source', label: 'Source' },
+    { key: 'priority', label: 'Priority' },
+    { key: 'status', label: 'Status' },
+  ]
+
+  const changes = []
+  for (const { key, label, format } of trackedFields) {
+    if (req.body[key] !== undefined) {
+      const oldVal = customer[key] || ''
+      const rawNew = req.body[key]
+      const newVal = rawNew !== null && rawNew !== undefined ? String(rawNew).trim() : ''
+      if (String(oldVal).trim() !== newVal) {
+        const fmtOld = format ? format(oldVal) : (oldVal || 'empty')
+        const fmtNew = format ? format(rawNew) : (newVal || 'empty')
+        changes.push(`${label}: ${fmtOld} → ${fmtNew}`)
+      }
+    }
+  }
+
+  // Clean empty strings for optional fields in req.body
+  const updatePayload = { ...req.body }
+  for (const k of ['email', 'altMobile', 'address', 'occupation', 'propertyType', 'configuration', 'preferredLocation', 'source', 'priority']) {
+    if (updatePayload[k] === '') updatePayload[k] = undefined
+  }
+
+  Object.assign(customer, updatePayload)
+
+  const changeSummary = changes.length > 0 ? changes.join(', ') : 'details updated'
+  const actorRoleLabel = req.user.role.replace(/_/g, ' ')
+
+  // Activity log: explicitly record rename or field changes with full details
+  if (nameChanged) {
+    customer.logActivity(
+      'renamed',
+      `Lead renamed from "${oldName}" to "${newName}" by ${req.user.name} (${actorRoleLabel}). Changes: ${changeSummary}`,
+      req.user._id,
+      { oldName, newName, changes }
+    )
+  } else {
+    customer.logActivity(
+      'updated',
+      `Lead updated by ${req.user.name} (${actorRoleLabel}): ${changeSummary}`,
+      req.user._id,
+      { changes }
+    )
+  }
+
   await customer.save()
 
-  writeAudit({ req, action: AUDIT_ACTIONS.UPDATE, module: MODULES.CUSTOMER, targetId: customer._id, targetLabel: customer.name, description: `Updated ${customer.name}` })
+  // Audit log: structured description for formal audit
+  const auditDesc = nameChanged
+    ? `Renamed lead "${oldName}" to "${newName}" by ${req.user.name} (${changeSummary})`
+    : `Updated lead "${customer.name}" by ${req.user.name} (${changeSummary})`
+
+  writeAudit({
+    req,
+    action: AUDIT_ACTIONS.UPDATE,
+    module: MODULES.CUSTOMER,
+    targetId: customer._id,
+    targetLabel: customer.name,
+    description: auditDesc,
+    meta: {
+      oldName,
+      newName,
+      nameChanged,
+      changes,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+    },
+  })
+
+  // Notify upper hierarchy (Manager, Sub-Admin, Admin) so they understand the flow and changes
+  if (req.user.role === ROLES.SALES_EXECUTIVE) {
+    const recipients = new Set()
+    if (req.user.manager) {
+      recipients.add(String(req.user.manager))
+    }
+    const superiors = await User.find({
+      firm: req.user.firm,
+      role: { $in: [ROLES.ADMIN, ROLES.SUB_ADMIN] },
+      isActive: true,
+      _id: { $ne: req.user._id },
+    }).select('_id role branch').lean()
+
+    for (const sup of superiors) {
+      if (sup.role === ROLES.ADMIN || !req.user.branch || !sup.branch || sup.branch === req.user.branch) {
+        recipients.add(String(sup._id))
+      }
+    }
+
+    if (recipients.size > 0) {
+      const notifTitle = nameChanged
+        ? `Lead Renamed: "${oldName}" → "${newName}"`
+        : `Lead Updated: "${customer.name}"`
+      const notifMessage = nameChanged
+        ? `${req.user.name} renamed lead from "${oldName}" to "${newName}". Changes: ${changeSummary}`
+        : `${req.user.name} updated lead "${customer.name}". Changes: ${changeSummary}`
+
+      await notifyMany([...recipients], {
+        firm: req.user.firm,
+        type: NOTIFICATION_TYPES.LEAD_ASSIGNED,
+        title: notifTitle,
+        message: notifMessage,
+        entityType: 'customer',
+        entityId: customer._id,
+        priority: nameChanged ? 'high' : 'medium',
+      })
+    }
+  }
+
   return ok(res, customer, 'Customer updated')
 })
 
