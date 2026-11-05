@@ -663,7 +663,7 @@ export default function SuperAdminReportsPage() {
       </Card>
 
       {/* Tabs Navigation */}
-      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-md pt-4 pb-6 mb-8 -mx-4 px-4 shadow-[0_8px_20px_-15px_rgba(0,0,0,0.1)] border-b border-slate-200">
+      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-md pt-4 pb-6 mb-8 -mx-4 sm:-mx-6 px-4 sm:px-6 shadow-[0_8px_20px_-15px_rgba(0,0,0,0.1)] border-b border-slate-200">
         <div className="overflow-x-auto scrollbar-hide">
           <nav className="flex gap-3 min-w-max" aria-label="Tabs">
             {[

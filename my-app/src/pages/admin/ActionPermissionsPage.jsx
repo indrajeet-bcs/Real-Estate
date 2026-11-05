@@ -154,7 +154,7 @@ export default function ActionPermissionsPage() {
   if (!roleData) return <div className="p-8 text-center text-slate-500">Loading role context...</div>
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 pb-32">
+    <div className="space-y-6 pb-12">
       {/* Role Selector at the top */}
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row sm:items-center justify-between shadow-sm gap-4">
         <div>

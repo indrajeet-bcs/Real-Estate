@@ -220,6 +220,7 @@ export default function App() {
               <Route path="expenses" element={<ExpensesPage title="Expense Management" subtitle="Record, track, verify and analyze company expenses." />} />
               <Route path="legal" element={<LegalPage title="Legal Management" subtitle="Track document collection, verification and agreements until registration." />} />
               <Route path="support" element={<CustomerSupportPage />} />
+              <Route path="support/categories" element={<TicketCategoriesPage />} />
 
               {/* Overrides & Finance */}
               <Route path="commissions" element={<CommissionsPage />} />

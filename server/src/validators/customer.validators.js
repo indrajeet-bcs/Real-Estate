@@ -6,24 +6,24 @@ const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id')
 export const createCustomerSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Must be a valid 10-digit mobile number starting with 6, 7, 8, or 9'),
-  altMobile: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
-  address: z.string().optional(),
-  occupation: z.string().optional(),
-  budgetMin: z.coerce.number().optional(),
-  budgetMax: z.coerce.number().optional(),
+  altMobile: z.string().optional().or(z.literal('')).nullable(),
+  email: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.string().email().optional()),
+  address: z.string().optional().or(z.literal('')).nullable(),
+  occupation: z.string().optional().or(z.literal('')).nullable(),
+  budgetMin: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : Number(val)), z.number().optional()),
+  budgetMax: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : Number(val)), z.number().optional()),
   // Property requirement (Employee spec §Add New Lead / Property Requirement).
-  propertyType: z.string().optional(),
-  configuration: z.string().optional(),
-  preferredLocation: z.string().optional(),
-  source: z.enum(LEAD_SOURCES).optional(),
-  assignedTo: objectId.optional(),
-  priority: z.enum(['low', 'medium', 'high']).optional(),
+  propertyType: z.string().optional().or(z.literal('')).nullable(),
+  configuration: z.string().optional().or(z.literal('')).nullable(),
+  preferredLocation: z.string().optional().or(z.literal('')).nullable(),
+  source: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.enum(LEAD_SOURCES).optional()),
+  assignedTo: z.preprocess((val) => (val === '' || val === null ? undefined : val), objectId.optional()),
+  priority: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.enum(['low', 'medium', 'high']).optional()),
   kycStatus: z.enum(['pending', 'complete', 'rejected']).optional(),
   reraDocSigned: z.boolean().optional(),
   // Transient helpers accepted only on create (Add New Lead form).
-  note: z.string().optional(), // initial note captured with the lead
-  interestedProject: objectId.optional(), // tag a project interest immediately
+  note: z.string().optional().or(z.literal('')).nullable(), // initial note captured with the lead
+  interestedProject: z.preprocess((val) => (val === '' || val === null ? undefined : val), objectId.optional()), // tag a project interest immediately
 })
 
 export const updateCustomerSchema = createCustomerSchema
@@ -34,9 +34,9 @@ export const listCustomersSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(500).default(20),
   search: z.string().optional(),
-  status: z.enum([...Object.values(CUSTOMER_STATUS), 'all']).default('all'),
-  priority: z.enum(['low', 'medium', 'high', 'all']).optional(),
-  assignedTo: objectId.optional(),
+  status: z.preprocess((val) => (val === '' || val === null ? 'all' : val), z.enum([...Object.values(CUSTOMER_STATUS), 'all']).default('all')),
+  priority: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.enum(['low', 'medium', 'high', 'all']).optional()),
+  assignedTo: z.preprocess((val) => (val === '' || val === null ? undefined : val), objectId.optional()),
   unassigned: z.enum(['true', 'false']).optional(), // Branch-admin port: pool
 })
 

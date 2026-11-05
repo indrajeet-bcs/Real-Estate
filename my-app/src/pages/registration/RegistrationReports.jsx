@@ -54,7 +54,7 @@ export default function RegistrationReports() {
   const exportEmp = () => exportRowsToCsv('registration-employee.csv', r.byEmployee.map((x) => ({ Employee: x._id || '—', Cases: x.cases, Completed: x.completed || 0 })))
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-3 mb-2">← Back to Dashboard</Button>
         <PageHeader
@@ -102,7 +102,7 @@ function ReportCard({ title, subtitle, onExport, disabled, children }) {
 function MiniTable({ rows, cols }) {
   if (!rows || rows.length === 0) return <p className="text-sm text-slate-400">No data yet.</p>
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-100">
+    <div className="overflow-x-auto rounded-lg border border-slate-100 thin-scroll">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>{cols.map((c) => <th key={c[1]} className="px-3 py-2 font-medium">{c[1]}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">

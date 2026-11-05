@@ -59,7 +59,7 @@ export default function NotificationHistoryPage() {
         subtitle="Review the delivery logs for all platform announcements."
       />
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card className="p-4"><div className="text-sm text-slate-500">Total Notifications</div><div className="text-2xl font-semibold">{kpis.total}</div></Card>
         <Card className="p-4"><div className="text-sm text-slate-500">Delivered</div><div className="text-2xl font-semibold text-emerald-600">{kpis.delivered}</div></Card>
         <Card className="p-4"><div className="text-sm text-slate-500">Failed</div><div className="text-2xl font-semibold text-red-600">{kpis.failed}</div></Card>

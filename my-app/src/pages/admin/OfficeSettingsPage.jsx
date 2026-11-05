@@ -28,7 +28,7 @@ export default function OfficeSettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <PageHeader 
         title="Company Settings" 
         subtitle="Manage company-wide settings and operational preferences." 

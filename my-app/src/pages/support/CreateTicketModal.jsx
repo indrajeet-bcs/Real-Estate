@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { Card, Button, Input, Select } from '../../components/ui.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { ticketsApi, ticketCategoriesApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 
@@ -11,13 +12,42 @@ const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 // loaded live from the ticket-category catalog.
 export default function CreateTicketModal({ onClose, onDone }) {
   const toast = useToast()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ category: '', priority: 'Medium', subject: '', description: '' })
+  const [newCatOpen, setNewCatOpen] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatBusy, setNewCatBusy] = useState(false)
 
   const cats = useFetch(useCallback(() => ticketCategoriesApi.list(), []))
   const categories = (cats.data || []).filter((c) => c.isActive !== false)
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const handleQuickAddCategory = async (e) => {
+    e?.preventDefault()
+    if (!newCatName.trim()) {
+      toast.error('Category name is required')
+      return
+    }
+    setNewCatBusy(true)
+    try {
+      const res = await ticketCategoriesApi.create({ name: newCatName.trim() })
+      toast.success('Category created successfully')
+      setNewCatName('')
+      setNewCatOpen(false)
+      await cats.refetch()
+      if (res.data?.data?._id) {
+        setForm((f) => ({ ...f, category: res.data.data._id }))
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create category')
+    } finally {
+      setNewCatBusy(false)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -53,7 +83,38 @@ export default function CreateTicketModal({ onClose, onDone }) {
         <div className="flex-1 overflow-y-auto p-6">
           <form id="create-ticket-form" onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
-              <h4 className="border-b pb-2 text-sm font-semibold text-slate-800">Classification</h4>
+              <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="text-sm font-semibold text-slate-800">Classification</h4>
+                {isAdmin && !newCatOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setNewCatOpen(true)}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 transition"
+                  >
+                    + Add New Category
+                  </button>
+                )}
+              </div>
+
+              {newCatOpen && isAdmin && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 space-y-2">
+                  <div className="text-xs font-semibold text-blue-900">Create New Ticket Category</div>
+                  <p className="text-[11px] text-blue-700">Categories added here will be immediately available to all Sub-Admins and Sales Executives.</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+                      placeholder="Category name (e.g. Payment Issue, Portal Query)…"
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      autoFocus
+                    />
+                    <Button size="sm" onClick={handleQuickAddCategory} loading={newCatBusy}>Save</Button>
+                    <Button size="sm" variant="secondary" onClick={() => setNewCatOpen(false)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <Select label="Category *" value={form.category} onChange={set('category')} required>
                   <option value="">{cats.loading ? 'Loading…' : 'Select Category'}</option>
@@ -64,7 +125,11 @@ export default function CreateTicketModal({ onClose, onDone }) {
                 </Select>
               </div>
               {!cats.loading && categories.length === 0 && (
-                <p className="text-xs text-amber-600">No ticket categories exist yet. Ask a Super Admin to create categories first.</p>
+                isAdmin ? (
+                  <p className="text-xs text-blue-600">No ticket categories exist yet. Click "+ Add New Category" above to create one.</p>
+                ) : (
+                  <p className="text-xs text-amber-600">No ticket categories exist yet. Please ask an Admin to create categories.</p>
+                )
               )}
             </div>
 

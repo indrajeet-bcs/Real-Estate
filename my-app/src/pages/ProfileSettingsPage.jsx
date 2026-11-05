@@ -38,7 +38,7 @@ export default function ProfileSettingsPage() {
   const { user, updateUser } = useAuth()
   if (!user) return <div><PageHeader title="Profile & Settings" /><Loader /></div>
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl space-y-6">
       <PageHeader title="Profile & Settings" subtitle="Manage your personal information, security and notification preferences." />
       <MyProfile user={user} onSaved={updateUser} />
       <NotificationPreferences user={user} onSaved={updateUser} />

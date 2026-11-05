@@ -205,7 +205,9 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 min
   await user.save()
 
-  // Send real OTP email to the registered address
+  // Send real OTP email to the registered address.
+  // With direct SSL on port 465, this takes ~2 seconds and ensures the container
+  // finishes delivering the SMTP packet before closing the request.
   const emailResult = await sendOtpEmail({
     to: user.email,
     name: user.name,

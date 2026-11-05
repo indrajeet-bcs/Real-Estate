@@ -28,6 +28,17 @@ export function setSessionUpdatedHandler(fn) {
   onSessionUpdated = fn
 }
 
+// Global CRUD mutation notification bus
+export function notifyDataMutation(detail = {}) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('crm:data-mutation', { detail }))
+  }
+}
+
+export function triggerGlobalRefresh() {
+  notifyDataMutation({ manual: true, timestamp: Date.now() })
+}
+
 api.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`
@@ -35,11 +46,22 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// On a 401, try one silent refresh, then replay the original request.
+// On successful response: if method was POST, PUT, PATCH, or DELETE,
+// broadcast an instant mutation event so all active views refresh automatically.
 let refreshing = null
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    const method = res.config?.method?.toLowerCase()
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      const url = res.config?.url || ''
+      // Ignore auth session endpoints
+      if (!url.includes('/auth/login') && !url.includes('/auth/refresh') && !url.includes('/auth/me')) {
+        notifyDataMutation({ method, url, timestamp: Date.now() })
+      }
+    }
+    return res
+  },
   async (error) => {
     const original = error.config
     const status = error.response?.status

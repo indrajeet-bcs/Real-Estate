@@ -12,31 +12,27 @@ function getTransporter() {
     return null
   }
 
-  const isGmail = env.email.host.includes('gmail')
-  const transportConfig = isGmail
-    ? {
-        service: 'gmail',
-        auth: {
-          user: env.email.user,
-          pass: env.email.pass.replace(/\s+/g, ''), // strip spaces if copied with spaces
-        },
-      }
-    : {
-        host: env.email.host,
-        port: env.email.port,
-        secure: env.email.secure,
-        auth: {
-          user: env.email.user,
-          pass: env.email.pass,
-        },
-      }
+  // Direct SSL on port 465 with strict timeouts.
+  // We avoid persistent pooling because cloud proxies and NAT gateways (Render, AWS)
+  // drop idle connections silently, causing 2-3 minute TCP retransmission timeouts.
+  transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    connectionTimeout: 7000, // 7s max to connect
+    greetingTimeout: 5000,   // 5s max for SMTP banner
+    socketTimeout: 10000,    // 10s max per socket command (prevents 2-3 min TCP hang)
+    auth: {
+      user: env.email.user.trim(),
+      pass: env.email.pass.replace(/\s+/g, '').trim(),
+    },
+  })
 
-  transporter = nodemailer.createTransport(transportConfig)
   return transporter
 }
 
 /**
- * Send a generic email.
+ * Send a generic email with high-priority transactional headers.
  */
 export async function sendEmail({ to, subject, html, text }) {
   const mailer = getTransporter()
@@ -53,6 +49,12 @@ export async function sendEmail({ to, subject, html, text }) {
       subject,
       text,
       html,
+      priority: 'high',
+      headers: {
+        'X-Priority': '1 (Highest)',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'High',
+      },
     })
     // eslint-disable-next-line no-console
     console.log(`[email] Successfully sent message ${info.messageId} to ${to}`)

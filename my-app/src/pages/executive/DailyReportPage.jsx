@@ -66,7 +66,7 @@ export default function DailyReportPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="space-y-6">
       <PageHeader title="Daily (EOD) Report" subtitle="Wrap up your day — log your activity, note blockers and plan tomorrow." />
 
       {ctx.loading || !form ? (

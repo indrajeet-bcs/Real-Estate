@@ -106,7 +106,7 @@ export default function DashboardLayout() {
 
       {/* Sidebar — static collapsible on desktop, off-canvas drawer on mobile */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-200 bg-white transition-all duration-300 ease-in-out lg:static lg:z-auto lg:h-screen lg:sticky lg:top-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-200 bg-white transition-all duration-300 ease-in-out lg:relative lg:z-auto lg:h-screen ${
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${
           desktopSidebarOpen
