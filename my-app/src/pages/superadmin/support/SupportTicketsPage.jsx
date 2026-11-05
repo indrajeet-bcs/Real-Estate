@@ -69,8 +69,17 @@ export default function SupportTicketsPage() {
         await ticketsApi.addNote(selectedTicket._id, note)
         toast.success('Internal note added')
       } else if (type === 'status') {
-        await ticketsApi.changeStatus(selectedTicket._id, newStatus)
-        toast.success('Status updated')
+        const isReopen = (selectedTicket.status === 'Resolved' || selectedTicket.status === 'Closed') && (newStatus === 'Open' || newStatus === 'In Progress')
+        if ((newStatus === 'Resolved' || newStatus === 'Closed' || isReopen) && !note.trim()) {
+          toast.error(
+            isReopen
+              ? 'Please provide reopening reason / follow-up notes before saving'
+              : `Please provide ${newStatus === 'Resolved' ? 'resolution details' : 'closing remarks'} before saving`
+          )
+          return
+        }
+        await ticketsApi.changeStatus(selectedTicket._id, { status: newStatus, remark: note.trim() })
+        toast.success(isReopen ? 'Ticket reopened successfully' : `Status updated to ${newStatus}`)
       } else if (type === 'reply') {
         if (!note.trim()) { toast.error('Please enter a reply'); return }
         await ticketsApi.addNote(selectedTicket._id, note)
@@ -99,6 +108,25 @@ export default function SupportTicketsPage() {
     setActionModal(type)
     if (type === 'status') setNewStatus(ticket.status)
     if (type === 'assign') setAssigneeId(ticket.assignedTo?._id || '')
+  }
+
+  const [ticketToDelete, setTicketToDelete] = useState(null)
+  const [deletingTicket, setDeletingTicket] = useState(false)
+
+  const handleConfirmDeleteTicket = async () => {
+    if (!ticketToDelete) return
+    setDeletingTicket(true)
+    try {
+      await ticketsApi.remove(ticketToDelete._id)
+      toast.success(`Ticket ${ticketToDelete.ticketId} deleted successfully`)
+      if (actionModal === 'view') setActionModal(null)
+      setTicketToDelete(null)
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete ticket')
+    } finally {
+      setDeletingTicket(false)
+    }
   }
 
   const kpis = meta?.kpis || {}
@@ -216,6 +244,13 @@ export default function SupportTicketsPage() {
                               if (e.target.value === 'note') openModal('note', t)
                               if (e.target.value === 'reply') handleAction('reply')
                               if (e.target.value === 'assign') openModal('assign', t)
+                              if (e.target.value === 'reopen') {
+                                setSelectedTicket(t)
+                                setNewStatus('Open')
+                                setNote('')
+                                setActionModal('status')
+                              }
+                              if (e.target.value === 'delete') setTicketToDelete(t)
                             }}
                           >
                             <option value="" disabled>Actions...</option>
@@ -223,6 +258,8 @@ export default function SupportTicketsPage() {
                             <option value="status">Change Status</option>
                             <option value="assign">Assign</option>
                             <option value="note">Add Note</option>
+                            {(t.status === 'Resolved' || t.status === 'Closed') && <option value="reopen">Reopen Ticket</option>}
+                            {t.status === 'Closed' && <option value="delete">Delete Ticket</option>}
                           </Select>
                         </div>
                       </td>
@@ -263,7 +300,7 @@ export default function SupportTicketsPage() {
       {actionModal === 'status' && (
         <Modal 
           open 
-          title={`Update Status: ${selectedTicket?.ticketId}`} 
+          title={newStatus === 'Open' && (selectedTicket?.status === 'Resolved' || selectedTicket?.status === 'Closed') ? `Reopen Ticket: ${selectedTicket?.ticketId}` : `Update Status: ${selectedTicket?.ticketId}`} 
           onClose={() => setActionModal(null)}
           footer={
             <>
@@ -272,13 +309,43 @@ export default function SupportTicketsPage() {
             </>
           }
         >
-          <Select label="Status" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Waiting for Customer">Waiting for Customer</option>
-            <option value="Resolved">Resolved</option>
-            <option value="Closed">Closed</option>
-          </Select>
+          <div className="space-y-4">
+            <Select label="Status" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+              <option value="Open">Open</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Waiting for Customer">Waiting for Customer</option>
+              <option value="Resolved">Resolved</option>
+              <option value="Closed">Closed</option>
+            </Select>
+
+            {((newStatus === 'Resolved' || newStatus === 'Closed') ||
+              ((selectedTicket?.status === 'Resolved' || selectedTicket?.status === 'Closed') && (newStatus === 'Open' || newStatus === 'In Progress'))) && (
+              <div>
+                <Textarea
+                  label={
+                    newStatus === 'Resolved'
+                      ? "Resolution Details / Remarks *"
+                      : newStatus === 'Closed'
+                      ? "Closing Remarks *"
+                      : "Reopening Reason / Follow-up Notes *"
+                  }
+                  placeholder={
+                    newStatus === 'Resolved'
+                      ? "Describe in detail how this ticket was resolved..."
+                      : newStatus === 'Closed'
+                      ? "Enter closing remarks regarding this ticket..."
+                      : "Describe why this ticket is being reopened for further follow-up..."
+                  }
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  required
+                />
+                <p className="mt-1 text-xs font-medium text-amber-600">
+                  * Mandatory: {newStatus === 'Open' || newStatus === 'In Progress' ? 'Reason for reopening this ticket is required.' : `Details regarding how the ticket was ${newStatus.toLowerCase()} are required.`}
+                </p>
+              </div>
+            )}
+          </div>
         </Modal>
       )}
 
@@ -312,17 +379,93 @@ export default function SupportTicketsPage() {
           wide
           title={`Ticket Details: ${selectedTicket?.ticketId}`} 
           onClose={() => setActionModal(null)}
-          footer={<Button onClick={() => setActionModal(null)}>Close</Button>}
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <div className="flex gap-2">
+                {selectedTicket?.status !== 'Resolved' && selectedTicket?.status !== 'Closed' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setActionModal('status')
+                      setNewStatus('Resolved')
+                      setNote('')
+                    }}
+                  >
+                    Mark as Resolve
+                  </Button>
+                )}
+                {selectedTicket?.status === 'Resolved' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setActionModal('status')
+                      setNewStatus('Closed')
+                      setNote('')
+                    }}
+                  >
+                    Close
+                  </Button>
+                )}
+                {(selectedTicket?.status === 'Resolved' || selectedTicket?.status === 'Closed') && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setActionModal('status')
+                      setNewStatus('Open')
+                      setNote('')
+                    }}
+                  >
+                    Reopen Ticket
+                  </Button>
+                )}
+                {selectedTicket?.status === 'Closed' && (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => setTicketToDelete(selectedTicket)}
+                  >
+                    Delete Ticket
+                  </Button>
+                )}
+              </div>
+              <Button onClick={() => setActionModal(null)}>Close Window</Button>
+            </div>
+          }
         >
           <div className="space-y-4">
             <h3 className="text-xl font-bold">{selectedTicket?.subject}</h3>
             <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded border border-slate-200">
               <div><span className="text-slate-500">Company:</span> <span className="font-medium">{selectedTicket?.firm?.name}</span></div>
-              <div><span className="text-slate-500">Category:</span> <span className="font-medium">{selectedTicket?.category?.name}</span></div>
+              <div><span className="text-slate-500">Category:</span> <span className="font-medium">{selectedTicket?.category?.name || '—'}</span></div>
               <div><span className="text-slate-500">Status:</span> <StatusBadge status={selectedTicket?.status} /></div>
               <div><span className="text-slate-500">Priority:</span> <PriorityBadge priority={selectedTicket?.priority} /></div>
               <div className="col-span-2"><span className="text-slate-500">Assigned To:</span> <span className="font-medium">{selectedTicket?.assignedTo?.name || 'Unassigned'}</span></div>
             </div>
+
+            {selectedTicket?.resolutionNote && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                    <span className="text-emerald-600 font-bold">✓</span> Resolution Details
+                  </span>
+                  {selectedTicket.resolvedAt && (
+                    <span className="text-xs text-emerald-600 font-medium">
+                      {formatDate(selectedTicket.resolvedAt, true)}
+                    </span>
+                  )}
+                </div>
+                <p className="whitespace-pre-wrap text-sm text-slate-800 font-medium">{selectedTicket.resolutionNote}</p>
+                {selectedTicket.resolvedBy?.name && (
+                  <div className="mt-2 text-xs text-slate-500">
+                    Resolved by: <span className="font-semibold text-slate-700">{selectedTicket.resolvedBy.name}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <h4 className="font-semibold mb-2">Description</h4>
               <p className="whitespace-pre-wrap text-sm text-slate-700 bg-white p-4 border border-slate-200 rounded">{selectedTicket?.description}</p>
@@ -342,6 +485,36 @@ export default function SupportTicketsPage() {
             )}
           </div>
         </Modal>
+      )}
+
+      {/* Delete ticket confirmation popup */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">Confirm Delete</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Are you sure you want to permanently delete ticket <span className="font-semibold text-slate-700">{ticketToDelete.ticketId}</span>? This action cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setTicketToDelete(null)}
+                disabled={deletingTicket}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteTicket}
+                disabled={deletingTicket}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingTicket ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

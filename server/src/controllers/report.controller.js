@@ -658,6 +658,7 @@ export const subAdminOverview = asyncHandler(async (req, res) => {
     presentToday, onLeaveToday, pendingLeaves, reservedBookings, heldUnits, unassignedLeads,
     followDue, followCompleted, followOverdue,
     upcomingVisits, leadSourceAgg, recentActivity, collectedAgg, trendDocs,
+    pendingDiscounts,
   ] = await Promise.all([
     Customer.countDocuments({ firm, assignedTo: { $in: teamIds }, createdAt: { $gte: todayStart, $lte: todayEnd } }),
     SiteVisit.countDocuments({ firm, assignedTo: { $in: teamIds }, scheduledAt: { $gte: todayStart, $lte: todayEnd } }),
@@ -683,6 +684,7 @@ export const subAdminOverview = asyncHandler(async (req, res) => {
       { $group: { _id: null, total: { $sum: '$payments.amount' } } },
     ]),
     Booking.find({ firm, bookedBy: { $in: teamIds }, status: BOOKING_STATUS.CONFIRMED, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6) } }).select('createdAt totalValue bookingAmount').lean(),
+    Booking.countDocuments({ firm, bookedBy: { $in: teamIds }, 'discountRequest.status': 'pending' }),
   ])
 
   const totalRevenue = revenueAgg[0]?.v || 0
@@ -706,11 +708,12 @@ export const subAdminOverview = asyncHandler(async (req, res) => {
     { type: 'followup', label: 'Overdue follow-ups', count: followOverdue },
     { type: 'approval', label: 'Pending approvals', count: pendingLeaves },
     { type: 'booking', label: 'Bookings awaiting confirmation', count: reservedBookings },
+    { type: 'discount', label: 'Discount requests pending', count: pendingDiscounts },
     { type: 'inventory', label: 'Units on hold', count: heldUnits },
     { type: 'lead', label: 'Unassigned leads', count: unassignedLeads },
   ].filter((a) => a.count > 0)
 
-  const pendingApprovals = pendingLeaves + reservedBookings
+  const pendingApprovals = pendingLeaves + reservedBookings + pendingDiscounts
 
   return ok(res, {
     branch: branch?.name || req.user.branch || null,
@@ -728,7 +731,7 @@ export const subAdminOverview = asyncHandler(async (req, res) => {
     },
     topAlerts: allAlerts.slice(0, 3),
     alertsTotal: allAlerts.reduce((s, a) => s + a.count, 0),
-    actionCenter: { pendingLeaves, reservedBookings, heldUnits, unassignedLeads, total: pendingLeaves + reservedBookings + heldUnits + unassignedLeads },
+    actionCenter: { pendingLeaves, reservedBookings, pendingDiscounts, heldUnits, unassignedLeads, total: pendingLeaves + reservedBookings + pendingDiscounts + heldUnits + unassignedLeads },
     followUps: { due: followDue, completed: followCompleted, overdue: followOverdue },
     upcomingVisits,
     teamPerformance: perf,

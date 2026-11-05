@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { NAV_BY_ROLE } from '../../lib/navConfig.js'
@@ -9,6 +9,13 @@ import NotificationBell from './NotificationBell.jsx'
 
 // Shared shell for all authenticated role dashboards: sidebar nav (role-gated)
 // + top bar with the current user and logout.
+const PROFILE_PATHS = {
+  [ROLES.SUPER_ADMIN]: '/super-admin/profile',
+  [ROLES.ADMIN]: '/admin/profile',
+  [ROLES.SUB_ADMIN]: '/sub-admin/profile',
+  [ROLES.SALES_EXECUTIVE]: '/executive/profile',
+}
+
 export default function DashboardLayout() {
   const { user, logout } = useAuth()
   const toast = useToast()
@@ -20,6 +27,9 @@ export default function DashboardLayout() {
   const [actionCount, setActionCount] = useState(0)
   const [geofenceRadius, setGeofenceRadius] = useState(200)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const profileMenuRef = useRef(null)
+  const profilePath = PROFILE_PATHS[user.role] || '/admin/profile'
 
   // Mobile drawer open state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -34,7 +44,25 @@ export default function DashboardLayout() {
   })
 
   // Close the mobile sidebar drawer whenever the route changes.
-  useEffect(() => { setMobileSidebarOpen(false) }, [location.pathname])
+  useEffect(() => {
+    setMobileSidebarOpen(false)
+    setShowProfileMenu(false)
+  }, [location.pathname])
+
+  // Close profile dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false)
+      }
+    }
+    if (showProfileMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showProfileMenu])
 
   // Persist desktop sidebar state
   useEffect(() => {
@@ -53,7 +81,7 @@ export default function DashboardLayout() {
 
   // Real geofence radius for the Sub-Admin's branch (footer card).
   useEffect(() => {
-    if (user.role !== ROLES.SUB_ADMIN) return undefined
+    if (user.role !== ROLES.SUB_ADMIN && user.role !== ROLES.ADMIN) return undefined
     let active = true
     branchSettingsApi.get()
       .then((res) => { if (active && res.data.data?.geofenceRadius) setGeofenceRadius(res.data.data.geofenceRadius) })
@@ -63,7 +91,7 @@ export default function DashboardLayout() {
 
   // Live pending-approvals count for the Sub-Admin Action Center badge.
   useEffect(() => {
-    if (user.role !== ROLES.SUB_ADMIN) return undefined
+    if (user.role !== ROLES.SUB_ADMIN && user.role !== ROLES.ADMIN) return undefined
     let active = true
     actionCenterApi.summary()
       .then((res) => { if (active) setActionCount(res.data.data?.total || 0) })
@@ -221,7 +249,7 @@ export default function DashboardLayout() {
               >
                 <span className="material-symbols-outlined w-5 text-[20px] leading-none opacity-90">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
-                {item.path === '/sub-admin/action' && actionCount > 0 && (
+                {(item.path === '/sub-admin/action' || item.path === '/admin/action') && actionCount > 0 && (
                   <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
                     {actionCount}
                   </span>
@@ -273,23 +301,67 @@ export default function DashboardLayout() {
           </div>
           <div className="flex items-center gap-4">
             <NotificationBell />
-            {user.role === ROLES.SUPER_ADMIN ? (
-              <NavLink to="/super-admin/profile" className="text-right block hover:bg-slate-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-slate-200">
-                <div className="text-sm font-medium text-slate-900">{user.name}</div>
-                <div className="text-xs text-slate-500">{user.email}</div>
-              </NavLink>
-            ) : (
-              <div className="text-right p-1.5">
-                <div className="text-sm font-medium text-slate-900">{user.name}</div>
-                <div className="text-xs text-slate-500">{user.email}</div>
-              </div>
-            )}
-            <button
-              onClick={() => setShowLogoutConfirm(true)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-            >
-              Logout
-            </button>
+
+            {/* Profile Information & Dropdown Menu */}
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowProfileMenu((prev) => !prev)}
+                className="flex items-center gap-2.5 rounded-xl border border-transparent p-1.5 text-left transition hover:border-slate-200 hover:bg-slate-100/80 focus:outline-none"
+                aria-expanded={showProfileMenu}
+                aria-haspopup="true"
+              >
+                <div className="text-right">
+                  <div className="text-sm font-medium text-slate-900 leading-tight">{user.name}</div>
+                  <div className="text-xs text-slate-500 leading-tight">{user.email}</div>
+                </div>
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 font-semibold text-xs text-blue-700 border border-blue-200">
+                  {(user.name || 'U').charAt(0).toUpperCase()}
+                </div>
+                <span
+                  className="material-symbols-outlined text-[18px] text-slate-400 transition-transform duration-200"
+                  style={{ transform: showProfileMenu ? 'rotate(180deg)' : 'none' }}
+                >
+                  expand_more
+                </span>
+              </button>
+
+              {showProfileMenu && (
+                <div className="absolute right-0 mt-2 w-52 origin-top-right rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-black/5 z-50">
+                  <div className="px-3 py-2 border-b border-slate-100 mb-1">
+                    <div className="text-xs font-semibold text-slate-900 truncate">{user.name}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
+                    <div className="mt-1 inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                      {ROLE_LABELS[user.role] || user.role}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false)
+                      navigate(profilePath)
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 text-left"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-slate-500">account_circle</span>
+                    <span className="font-medium">Profile</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false)
+                      setShowLogoutConfirm(true)
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-red-600 transition hover:bg-red-50 hover:text-red-700 text-left"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-red-500">logout</span>
+                    <span className="font-medium">Logout</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

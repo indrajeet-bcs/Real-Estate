@@ -437,9 +437,16 @@ export const ticketsApi = {
   get: (id) => api.get(`/tickets/${id}`),
   create: (body) => api.post('/tickets', body),
   update: (id, body) => api.patch(`/tickets/${id}`, body),
-  changeStatus: (id, status) => api.patch(`/tickets/${id}/status`, { status }),
+  changeStatus: (id, statusOrBody, remark) => {
+    const payload = typeof statusOrBody === 'object' && statusOrBody !== null
+      ? statusOrBody
+      : { status: statusOrBody, remark }
+    return api.patch(`/tickets/${id}/status`, payload)
+  },
   assign: (id, assignedTo) => api.patch(`/tickets/${id}/assign`, { assignedTo }),
   addNote: (id, note) => api.post(`/tickets/${id}/notes`, { note }),
+  remove: (id) => api.delete(`/tickets/${id}`),
+  delete: (id) => api.delete(`/tickets/${id}`),
 }
 
 export const supportMembersApi = {

@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { leavesApi, bookingsApi, unitsApi, customersApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
@@ -17,16 +18,34 @@ function promptRemarks(action) {
 }
 
 export default function ActionCenterPage() {
-  const [tab, setTab] = useState('bookings')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTabParam = searchParams.get('tab')
+  const [tab, setTabState] = useState(activeTabParam || 'discounts')
   const [search, setSearch] = useState('')
 
+  useEffect(() => {
+    if (activeTabParam && activeTabParam !== tab) {
+      setTabState(activeTabParam)
+    }
+  }, [activeTabParam, tab])
+
+  const setTab = (newTab) => {
+    setTabState(newTab)
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.set('tab', newTab)
+      return p
+    })
+  }
+
+  const discounts = useFetch(useCallback(() => bookingsApi.list({ pendingRequests: 'discount', limit: 100 }), []))
   const leaves = useFetch(useCallback(() => leavesApi.list({ status: 'pending' }), []))
   const bookings = useFetch(useCallback(() => bookingsApi.list({ status: 'reserved' }), []))
   const units = useFetch(useCallback(() => unitsApi.list({ status: 'locked' }), []))
   const unassigned = useFetch(useCallback(() => customersApi.list({ unassigned: 'true', limit: 100 }), []))
 
   const counts = {
-    discounts: 0,
+    discounts: (discounts.data || []).length,
     bookings: (bookings.data || []).length,
     leaves: (leaves.data || []).length,
     lead_reassignments: (unassigned.data || []).length,
@@ -44,6 +63,11 @@ export default function ActionCenterPage() {
     { key: 'inventory_holds', label: 'Inventory Holds' },
     { key: 'circulars', label: 'Circulars' },
   ]
+
+  const refreshAllBookings = () => {
+    discounts.refetch()
+    bookings.refetch()
+  }
 
   return (
     <div>
@@ -68,11 +92,11 @@ export default function ActionCenterPage() {
         <Input label="Search" placeholder="Employee, customer, project…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
+      {tab === 'discounts' && <DiscountsTab q={discounts} onDecided={refreshAllBookings} search={search} />}
       {tab === 'bookings' && <BookingsTab q={bookings} search={search} />}
       {tab === 'leaves' && <LeavesTab q={leaves} search={search} />}
       {tab === 'lead_reassignments' && <ReassignTab q={unassigned} search={search} />}
       {tab === 'inventory_holds' && <HoldsTab q={units} search={search} />}
-      {tab === 'discounts' && <EmptyTab title="Discount Requests" note="Discount requests submitted by employees will appear here for review and forwarding to the Admin." />}
       {tab === 'staff_transfers' && <EmptyTab title="Staff Transfer Requests" note="Employee transfer requests awaiting your review will appear here." />}
       {tab === 'circulars' && <EmptyTab title="Circulars" note="Company circulars and acknowledgements will appear here." />}
     </div>
@@ -91,6 +115,170 @@ function EmptyTab({ title, note }) {
       <div className="text-2xl">✓</div>
       <h3 className="mt-2 text-sm font-semibold text-slate-700">{title}</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">{note}</p>
+    </Card>
+  )
+}
+
+// Discounts — approval flow: employee raises discount request, Admin/Sub-Admin approves or rejects.
+function DiscountsTab({ q, onDecided, search }) {
+  const toast = useToast()
+  const rows = filterRows(q.data || [], search, (r) => [
+    r.customer?.name,
+    r.project?.name,
+    r.unit?.unitNumber,
+    r.discountRequest?.requestedByName,
+    r.bookedBy?.name,
+    r.discountRequest?.remarks,
+    r.discountRequest?.givenBy,
+  ])
+
+  const handleApprove = async (booking) => {
+    const dr = booking.discountRequest
+    const amountLabel = formatMoney(dr?.totalDiscount || 0)
+    if (!window.confirm(`Approve requested discount of ${amountLabel} for booking ${shortId(booking._id)}?`)) return
+    try {
+      await bookingsApi.decideDiscount(booking._id, { decision: 'approve' })
+      toast.success('Discount request approved')
+      if (onDecided) onDecided()
+      else q.refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to approve discount')
+    }
+  }
+
+  const handleReject = async (booking) => {
+    const note = promptRemarks('Reject discount request')
+    if (!note) return
+    try {
+      await bookingsApi.decideDiscount(booking._id, { decision: 'reject', note })
+      toast.success('Discount request rejected')
+      if (onDecided) onDecided()
+      else q.refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reject discount')
+    }
+  }
+
+  const columns = [
+    {
+      key: 'id',
+      header: 'Booking ID',
+      render: (r) => (
+        <span className="font-mono text-xs font-semibold text-slate-700" title={r._id}>
+          {shortId(r._id)}
+        </span>
+      ),
+    },
+    {
+      key: 'executive',
+      header: 'Sales Executive',
+      render: (r) => (
+        <div>
+          <div className="font-medium text-slate-800">
+            {r.discountRequest?.requestedByName || r.bookedBy?.name || '—'}
+          </div>
+          {r.bookedBy?.branch && (
+            <div className="text-[11px] text-slate-400">{r.bookedBy.branch}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (r) => (
+        <div>
+          <div className="text-slate-800">{r.customer?.name || '—'}</div>
+          {r.customer?.mobile && <div className="text-[11px] text-slate-400">{r.customer.mobile}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'project',
+      header: 'Project · Unit',
+      render: (r) => `${r.project?.name || '—'} · Unit ${r.unit?.unitNumber || '—'}`,
+    },
+    {
+      key: 'saleAmount',
+      header: 'Original Sale',
+      render: (r) => formatMoney(r.discountRequest?.saleAmount || r.totalValue || 0),
+    },
+    {
+      key: 'requestedDiscount',
+      header: 'Requested Discount',
+      render: (r) => {
+        const dr = r.discountRequest
+        return (
+          <div>
+            <div className="font-semibold text-emerald-600">{formatMoney(dr?.totalDiscount || 0)}</div>
+            <div className="text-[11px] text-slate-400">
+              Firm: {formatMoney(dr?.firmDiscount || 0)} · Builder: {formatMoney(dr?.builderDiscount || 0)}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'finalAmount',
+      header: 'Final Sale Amount',
+      render: (r) => (
+        <span className="font-medium text-slate-900">
+          {formatMoney(r.discountRequest?.finalSaleAmount || 0)}
+        </span>
+      ),
+    },
+    {
+      key: 'remarks',
+      header: 'Remarks',
+      render: (r) => {
+        const dr = r.discountRequest
+        return (
+          <div className="max-w-[200px]">
+            <p className="truncate text-xs text-slate-600" title={dr?.remarks || ''}>
+              {dr?.remarks || '—'}
+            </p>
+            {dr?.supportingDocument?.fileUrl && (
+              <a
+                href={dr.supportingDocument.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline"
+              >
+                📎 Doc
+              </a>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'on',
+      header: 'Requested On',
+      render: (r) => formatDate(r.discountRequest?.requestedAt || r.createdAt),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (r) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="success" onClick={() => handleApprove(r)}>
+            Approve
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => handleReject(r)}>
+            Reject
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <Card className="p-5">
+      {q.loading ? (
+        <Loader />
+      ) : (
+        <Table columns={columns} rows={rows} empty="No discount requests awaiting approval." />
+      )}
     </Card>
   )
 }

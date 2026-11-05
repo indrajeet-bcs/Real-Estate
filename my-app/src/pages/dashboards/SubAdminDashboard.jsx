@@ -130,6 +130,7 @@ export default function SubAdminDashboard() {
           <SectionTitle action={<button onClick={() => navigate('/sub-admin/action')} className="text-xs text-blue-600 hover:underline">Open</button>}>Action Center</SectionTitle>
           <ul className="divide-y divide-slate-100 text-sm">
             {[
+              ['Discount requests', actionCenter.pendingDiscounts],
               ['Leave approvals', actionCenter.pendingLeaves],
               ['Bookings to confirm', actionCenter.reservedBookings],
               ['Units on hold', actionCenter.heldUnits],

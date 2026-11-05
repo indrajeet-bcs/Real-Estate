@@ -411,10 +411,11 @@ function MiniStat({ label, value }) {
 function PendingApprovals({ data, loading, navigate }) {
   if (loading) return <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-11 animate-pulse rounded-lg bg-slate-100" />)}</div>
   const items = [
-    { key: 'reservedBookings', label: 'Bookings awaiting confirmation', icon: '✓', to: '/admin/bookings', tone: 'text-amber-600' },
-    { key: 'heldUnits', label: 'Units on hold / locked', icon: '▦', to: '/admin/inventory', tone: 'text-blue-600' },
-    { key: 'unassignedLeads', label: 'Unassigned leads', icon: '☰', to: '/admin/leads', tone: 'text-violet-600' },
-    { key: 'pendingLeaves', label: 'Leave requests pending', icon: '◷', to: '/admin/employees', tone: 'text-rose-600' },
+    { key: 'pendingDiscounts', label: 'Discount requests pending', icon: '％', to: '/admin/action?tab=discounts', tone: 'text-emerald-600' },
+    { key: 'reservedBookings', label: 'Bookings awaiting confirmation', icon: '✓', to: '/admin/action?tab=bookings', tone: 'text-amber-600' },
+    { key: 'heldUnits', label: 'Units on hold / locked', icon: '▦', to: '/admin/action?tab=inventory_holds', tone: 'text-blue-600' },
+    { key: 'unassignedLeads', label: 'Unassigned leads', icon: '☰', to: '/admin/action?tab=lead_reassignments', tone: 'text-violet-600' },
+    { key: 'pendingLeaves', label: 'Leave requests pending', icon: '◷', to: '/admin/action?tab=leaves', tone: 'text-rose-600' },
   ]
   const active = items.filter((it) => (data?.[it.key] || 0) > 0)
   if (!data || active.length === 0) {

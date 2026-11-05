@@ -195,6 +195,7 @@ export default function App() {
                 Net-new consoles are stubbed; existing pages stay mounted for interim access. */}
             <Route path="/admin" element={shell(ROLES.ADMIN)}>
               <Route index element={<AdminDashboard />} />
+              <Route path="action" element={<ActionCenterPage />} />
 
               {/* Consoles */}
               <Route path="branches" element={<BranchesPage />} />
