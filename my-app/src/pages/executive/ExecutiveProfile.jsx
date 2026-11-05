@@ -30,7 +30,7 @@ export default function ExecutiveProfile() {
   }
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="max-w-5xl space-y-6">
       <PageHeader title="Profile" subtitle="Manage your personal information, account settings, and security preferences." />
       <ProfileInformation user={user} />
       <PersonalInformation user={user} onSaved={updateUser} />

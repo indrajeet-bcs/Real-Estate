@@ -178,7 +178,7 @@ export function PageHeader({ title, subtitle, actions }) {
         <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }
@@ -210,12 +210,12 @@ export function StatusBadge({ status }) {
 // --- Table ---
 export function Table({ columns, rows, empty = 'No records found', onRowClick }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm thin-scroll">
       <table className="w-full text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
             {columns.map((c) => (
-              <th key={c.key} className="px-4 py-3 font-medium">{c.header}</th>
+              <th key={c.key} className="whitespace-nowrap px-4 py-3 font-medium">{c.header}</th>
             ))}
           </tr>
         </thead>
@@ -359,17 +359,17 @@ export function Pagination({ meta, onPage, onPageSize, pageSizeOptions = [10, 20
 export function Modal({ open, onClose, title, children, footer, wide = false }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 pt-20">
+    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 sm:p-6 backdrop-blur-sm">
       <div
-        className={`w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-slate-200 bg-white shadow-2xl`}
+        className={`flex max-h-[90vh] w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
           <h3 className="font-semibold text-slate-900">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700">✕</button>
         </div>
-        <div className="thin-scroll max-h-[70vh] scroll-smooth overflow-y-auto px-6 py-5">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">{footer}</div>}
+        <div className="thin-scroll flex-1 scroll-smooth overflow-y-auto px-6 py-5">{children}</div>
+        {footer && <div className="shrink-0 flex justify-end gap-2 border-t border-slate-200 px-6 py-4">{footer}</div>}
       </div>
     </div>
   )

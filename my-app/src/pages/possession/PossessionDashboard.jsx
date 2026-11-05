@@ -12,7 +12,7 @@ export default function PossessionDashboard() {
   const recent = d.recent || []
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <PageHeader
         title="Possession Management"
         subtitle="Track handover readiness, scheduling and key handover to customers."

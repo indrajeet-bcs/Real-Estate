@@ -200,7 +200,7 @@ export default function PageTabAccessPage() {
   if (!roleData) return <div className="p-8 text-center text-slate-500">Loading role context...</div>
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       {/* Context Header */}
       <div className="mb-6">
         <Button variant="ghost" onClick={() => { if (!hasUnsavedChanges || window.confirm("Discard unsaved changes?")) navigate(`/admin/roles/${id}/permissions`) }} className="-ml-3 mb-2">

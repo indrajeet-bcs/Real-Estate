@@ -312,7 +312,7 @@ export default function PlatformSettingsPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/80 p-4 backdrop-blur-md lg:left-64 flex justify-end gap-3 shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)]">
+      <div className="sticky bottom-0 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 mt-8 z-30 border-t border-slate-200 bg-white/95 p-4 backdrop-blur-md flex justify-end gap-3 shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)]">
         <Button variant="secondary" onClick={handleReset} disabled={isSaving}>Reset</Button>
         <Button onClick={initiateSave} disabled={isSaving}>
           {isSaving ? 'Saving...' : 'Save Changes'}

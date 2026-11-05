@@ -34,7 +34,7 @@ export default function CreatePossessionCase() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-3 mb-2">← Back</Button>
         <PageHeader title="Create Possession Case" subtitle="Start a new handover tracking record. A readiness checklist is created automatically." />

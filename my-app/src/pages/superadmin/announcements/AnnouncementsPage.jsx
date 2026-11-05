@@ -137,7 +137,7 @@ export default function AnnouncementsPage() {
         actions={<Button onClick={() => openModal('add')}>+ Create Announcement</Button>}
       />
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card className="p-4"><div className="text-sm text-slate-500">Total</div><div className="text-2xl font-semibold">{kpis.total}</div></Card>
         <Card className="p-4"><div className="text-sm text-slate-500">Published</div><div className="text-2xl font-semibold text-emerald-600">{kpis.published}</div></Card>
         <Card className="p-4"><div className="text-sm text-slate-500">Draft</div><div className="text-2xl font-semibold text-slate-600">{kpis.draft}</div></Card>

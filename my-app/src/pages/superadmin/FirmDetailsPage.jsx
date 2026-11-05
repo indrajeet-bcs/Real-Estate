@@ -135,7 +135,7 @@ export default function FirmDetailsPage() {
   const isSuspended = firm.status === 'suspended'
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6">
       {/* PAGE HEADER */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex items-center gap-4">

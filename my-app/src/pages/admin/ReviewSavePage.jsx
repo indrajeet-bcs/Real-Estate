@@ -124,7 +124,7 @@ export default function ReviewSavePage() {
   const isSystemControlled = roleData.name === 'Company Owner' || roleData.name === 'SaaS Super Admin'
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 pb-32">
+    <div className="space-y-6 pb-12">
       {/* Role Selector */}
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row sm:items-center justify-between shadow-sm gap-4">
         <div>
