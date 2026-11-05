@@ -161,9 +161,9 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
         </div>
 
         {/* Body */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
           {/* Context */}
-          <div className="w-2/5 overflow-y-auto border-r border-slate-200 bg-slate-50/50 p-6">
+          <div className="w-full md:w-2/5 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 bg-slate-50/50 p-6">
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Ticket Context</h4>
             <div className="space-y-4">
               {ticket.firm?.name && (
@@ -184,7 +184,7 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
           </div>
 
           {/* Thread */}
-          <div className="flex w-3/5 flex-col overflow-hidden bg-white">
+          <div className="flex flex-1 w-full md:w-3/5 flex-col overflow-hidden bg-white">
             <div className="flex-1 overflow-y-auto p-6">
               <div className="mb-8 rounded-lg border border-blue-100 bg-blue-50/50 p-4">
                 <div className="mb-2 text-xs font-bold uppercase tracking-wider text-blue-800">Original Description</div>

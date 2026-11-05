@@ -64,7 +64,7 @@ export default function ExecutiveHome() {
   const recentLeads = [...cList].sort((a, b) => new Date(b.assignedAt || b.createdAt) - new Date(a.assignedAt || a.createdAt)).slice(0, 6)
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="space-y-6">
       {/* Section 1 — Welcome header */}
       <div>
         <p className="text-sm text-slate-500">Welcome back · {today}</p>

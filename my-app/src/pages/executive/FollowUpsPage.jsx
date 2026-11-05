@@ -619,12 +619,12 @@ function DetailsDrawer({ item, onClose, navigate }) {
   const projName = item.project?.name || '—'
 
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <div className="fixed inset-0 z-50 overflow-hidden">
       {/* backdrop */}
-      <div className="flex-1 bg-slate-900/40 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
 
       {/* panel */}
-      <div className="relative flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl">
+      <div className="fixed inset-y-0 right-0 flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl">
         {/* header */}
         <div className="flex items-start justify-between bg-slate-900 px-6 py-5 text-white">
           <div>

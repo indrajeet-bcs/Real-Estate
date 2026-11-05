@@ -4,7 +4,8 @@ import SupportMember from '../models/SupportMember.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ok, created } from '../utils/apiResponse.js'
-import { ROLES } from '../config/constants.js'
+import { ROLES, AUDIT_ACTIONS } from '../config/constants.js'
+import { writeAudit } from '../middleware/audit.js'
 
 // --- Categories ---
 
@@ -15,16 +16,41 @@ export const getCategories = asyncHandler(async (req, res) => {
 
 export const createCategory = asyncHandler(async (req, res) => {
   const { name } = req.body
-  const exists = await TicketCategory.findOne({ name })
+  if (!name || !name.trim()) throw ApiError.badRequest('Category name is required')
+  const cleanName = name.trim()
+  const exists = await TicketCategory.findOne({ name: { $regex: new RegExp(`^${cleanName}$`, 'i') } })
   if (exists) throw ApiError.conflict('Category name already exists')
-  const category = await TicketCategory.create({ name })
+  const category = await TicketCategory.create({ name: cleanName })
+  writeAudit({
+    req,
+    action: AUDIT_ACTIONS.CREATE,
+    module: 'ticket_category',
+    targetId: category._id,
+    targetLabel: category.name,
+    description: `Ticket category "${category.name}" created by ${req.user.name} (${req.user.role})`,
+  })
   return created(res, category, 'Category created')
 })
 
 export const updateCategory = asyncHandler(async (req, res) => {
   const { name } = req.body
-  const category = await TicketCategory.findByIdAndUpdate(req.params.id, { name }, { new: true })
+  if (!name || !name.trim()) throw ApiError.badRequest('Category name is required')
+  const cleanName = name.trim()
+  const exists = await TicketCategory.findOne({
+    _id: { $ne: req.params.id },
+    name: { $regex: new RegExp(`^${cleanName}$`, 'i') },
+  })
+  if (exists) throw ApiError.conflict('Category name already exists')
+  const category = await TicketCategory.findByIdAndUpdate(req.params.id, { name: cleanName }, { new: true })
   if (!category) throw ApiError.notFound('Category not found')
+  writeAudit({
+    req,
+    action: AUDIT_ACTIONS.UPDATE,
+    module: 'ticket_category',
+    targetId: category._id,
+    targetLabel: category.name,
+    description: `Ticket category updated to "${category.name}" by ${req.user.name}`,
+  })
   return ok(res, category, 'Category updated')
 })
 
@@ -45,6 +71,14 @@ export const deleteCategory = asyncHandler(async (req, res) => {
   }
   
   await TicketCategory.findByIdAndDelete(category._id)
+  writeAudit({
+    req,
+    action: AUDIT_ACTIONS.DELETE,
+    module: 'ticket_category',
+    targetId: category._id,
+    targetLabel: category.name,
+    description: `Ticket category "${category.name}" deleted by ${req.user.name}`,
+  })
   return ok(res, null, 'Category deleted')
 })
 

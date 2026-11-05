@@ -631,9 +631,9 @@ function VisitDetailsDrawer({ visit, onClose, onCall, onNavigate, onCheckIn, onC
   const timeline = (visit.timeline || []).slice().reverse()
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-slate-900/40 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl">
         <div className="flex items-start justify-between bg-slate-900 px-6 py-5 text-white">
           <div>
             <h2 className="text-lg font-bold">{c.name || 'Site Visit'}</h2>
@@ -644,7 +644,7 @@ function VisitDetailsDrawer({ visit, onClose, onCall, onNavigate, onCheckIn, onC
 
         <div className="flex-1 space-y-6 overflow-y-auto p-6">
           {/* Quick actions */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <QuickBtn icon="📞" label="Call" onClick={onCall} />
             <QuickBtn icon="🧭" label="Navigate" onClick={onNavigate} />
             <QuickBtn icon="👤" label="Profile" onClick={onProfile} />

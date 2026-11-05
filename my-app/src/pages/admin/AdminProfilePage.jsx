@@ -31,7 +31,7 @@ export default function AdminProfilePage() {
   if (!user) return <div><PageHeader title="My Profile" /><Loader /></div>
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl space-y-6">
       <PageHeader title="My Profile" subtitle="Manage your personal information, account details, and security settings." />
 
       {/* Section 1 — Basic Profile */}

@@ -255,9 +255,9 @@ function PropertyDetailsDrawer({ unit, units, onClose, onVisit, onBook, onShare 
   const mapUrl = p.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name || ''} ${p.location}`)}` : null
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-slate-900/40 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-lg flex-col overflow-hidden bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 flex h-full w-full max-w-lg flex-col overflow-hidden bg-white shadow-2xl">
         <div className="flex items-start justify-between bg-slate-900 px-6 py-5 text-white">
           <div>
             <h2 className="text-lg font-bold">{p.name || unit.project?.name || 'Property'}</h2>

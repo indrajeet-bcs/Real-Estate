@@ -42,7 +42,7 @@ export default function PossessionDetails() {
   const doneCount = checklist.filter((c) => c.status === 'Completed').length
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-3 mb-2">← Back</Button>
         <PageHeader
@@ -95,7 +95,7 @@ export default function PossessionDetails() {
       {activeTab === 'readiness' && (
         <Card className="p-5">
           <h3 className="mb-4 text-base font-semibold text-slate-900">Readiness Checklist <span className="text-sm font-normal text-slate-400">({doneCount}/{checklist.length} complete)</span></h3>
-          <div className="overflow-hidden rounded-lg border border-slate-100">
+          <div className="overflow-x-auto rounded-lg border border-slate-100 thin-scroll">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>
                 <th className="px-4 py-2 font-medium">Item</th><th className="px-4 py-2 font-medium">Status</th><th className="px-4 py-2 font-medium">Completed By</th><th className="px-4 py-2 font-medium">Date</th><th className="px-4 py-2 text-right font-medium">Action</th>

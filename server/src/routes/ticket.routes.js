@@ -13,14 +13,16 @@ const router = Router()
 router.use(authenticate)
 
 const superAdminOnly = requireRole(ROLES.SUPER_ADMIN)
+const adminOrSuperAdmin = requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN)
 
 // Categories — readable by any authenticated user (needed to file/classify a
-// ticket); managed by Super Admin only.
+// ticket); managed by Admin (Company Owner) and Super Admin only.
+// Sub-Admin and Sales Executives cannot create/edit/delete categories.
 router.get('/categories', getCategories)
-router.post('/categories', superAdminOnly, createCategory)
-router.patch('/categories/:id', superAdminOnly, updateCategory)
-router.patch('/categories/:id/status', superAdminOnly, toggleCategory)
-router.delete('/categories/:id', superAdminOnly, deleteCategory)
+router.post('/categories', adminOrSuperAdmin, createCategory)
+router.patch('/categories/:id', adminOrSuperAdmin, updateCategory)
+router.patch('/categories/:id/status', adminOrSuperAdmin, toggleCategory)
+router.delete('/categories/:id', adminOrSuperAdmin, deleteCategory)
 
 // Support Members — readable by any authenticated user (for assignment display);
 // managed by Super Admin only.
