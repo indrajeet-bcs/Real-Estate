@@ -3,13 +3,8 @@ import * as ctrl from '../controllers/customer.controller.js'
 import { authenticate } from '../middleware/auth.js'
 import { requirePermission } from '../middleware/rbac.js'
 import { requireRole } from '../middleware/rbac.js'
- preeti
 import { ApiError } from '../utils/ApiError.js'
 import { can } from '../config/permissions.js'
-
-import { can } from '../config/permissions.js'
-import { ApiError } from '../utils/ApiError.js'
-main
 import { validate } from '../middleware/validate.js'
 import { upload } from '../middleware/upload.js'
 import { MODULES, ROLES } from '../config/constants.js'
@@ -60,22 +55,6 @@ router.post(
   ctrl.importCustomers
 )
 
- preeti
-router.get('/', validate(listCustomersSchema, 'query'), requirePermission(MODULES.CUSTOMER, 'view'), ctrl.listCustomers)
-router.get('/:id', requirePermission(MODULES.CUSTOMER, 'view'), ctrl.getCustomer)
-router.post(
-  '/',
-  validate(createCustomerSchema),
-  (req, res, next) => {
-    if (can(req.user, MODULES.CUSTOMER, 'create') || can(req.user, MODULES.LEAD, 'create')) {
-      return next()
-    }
-    return next(ApiError.forbidden('Not permitted to create customer'))
-  },
-  ctrl.createCustomer
-)
-router.patch('/:id', validate(updateCustomerSchema), requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.updateCustomer)
-
 // Guarantees that Sales Executive, Sub-Admin, and Admin always have full access
 // to create, view, and edit leads/customers without RBAC 403 blocks.
 function requireLeadOrCustomerPermission(action) {
@@ -90,7 +69,6 @@ function requireLeadOrCustomerPermission(action) {
     return requirePermission(MODULES.LEAD, action)(req, res, next)
   }
 }
- main
 
 router.get('/', validate(listCustomersSchema, 'query'), requireLeadOrCustomerPermission('view'), ctrl.listCustomers)
 router.get('/:id', requireLeadOrCustomerPermission('view'), ctrl.getCustomer)
