@@ -318,6 +318,7 @@ function DecideRequestModal({ item, onClose, onDone }) {
 
 // Mandatory rejection popup for reservations / bookings (Sub-Admin / Admin)
 export function RejectBookingModal({ booking, onClose, onDone }) {
+  useBodyScrollLock(true)
   const toast = useToast()
   const [reason, setReason] = useState('')
   const [category, setCategory] = useState('')

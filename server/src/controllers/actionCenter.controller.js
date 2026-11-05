@@ -13,12 +13,13 @@ const OPEN = [CUSTOMER_STATUS.NEW, CUSTOMER_STATUS.IN_PROGRESS, CUSTOMER_STATUS.
 // (drives the sidebar badge + the Action Center hub).
 export const getActionSummary = asyncHandler(async (req, res) => {
   const scope = firmScope(req.user)
-  const [pendingLeaves, reservedBookings, heldUnits, unassignedLeads] = await Promise.all([
+  const [pendingLeaves, reservedBookings, heldUnits, unassignedLeads, pendingDiscounts] = await Promise.all([
     LeaveRequest.countDocuments({ ...scope, status: 'pending' }),
     Booking.countDocuments({ ...scope, status: BOOKING_STATUS.RESERVED }),
     Unit.countDocuments({ ...scope, status: UNIT_STATUS.LOCKED }),
     Customer.countDocuments({ ...scope, assignedTo: null, status: { $in: OPEN } }),
+    Booking.countDocuments({ ...scope, 'discountRequest.status': 'pending' }),
   ])
-  const total = pendingLeaves + reservedBookings + heldUnits + unassignedLeads
-  return ok(res, { pendingLeaves, reservedBookings, heldUnits, unassignedLeads, total }, 'Action center summary')
+  const total = pendingLeaves + reservedBookings + heldUnits + unassignedLeads + pendingDiscounts
+  return ok(res, { pendingLeaves, reservedBookings, heldUnits, unassignedLeads, pendingDiscounts, total }, 'Action center summary')
 })

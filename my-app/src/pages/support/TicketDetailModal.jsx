@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Card, Button, StatusBadge } from '../../components/ui.jsx'
+import { Card, Button, StatusBadge, useBodyScrollLock } from '../../components/ui.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { ROLES } from '../../lib/constants.js'
 import { ticketsApi } from '../../api/resources.js'
 import { formatDate, titleCase } from '../../lib/format.js'
 
@@ -11,13 +13,20 @@ const priorityCls = (p) =>
   p === 'Critical' ? 'bg-red-100 text-red-700' : p === 'High' ? 'bg-orange-100 text-orange-700' : p === 'Medium' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
 
 export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
+  useBodyScrollLock(true)
   const toast = useToast()
+  const { user } = useAuth()
   const [ticket, setTicket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [remark, setRemark] = useState('')
   const [saving, setSaving] = useState(false)
   const [busyStatus, setBusyStatus] = useState(false)
+  const [reopenModalOpen, setReopenModalOpen] = useState(false)
+  const [reopenReason, setReopenReason] = useState('')
+
+  // Authorized roles permitted to reopen closed/resolved tickets
+  const canReopen = [ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SUPER_ADMIN].includes(user?.role)
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -64,6 +73,25 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
     }
   }
 
+  const handleReopen = async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault()
+    setBusyStatus(true)
+    try {
+      await ticketsApi.changeStatus(ticketId, 'Open', {
+        note: reopenReason.trim() || 'Ticket reopened for further follow-up',
+      })
+      toast.success('Ticket reopened successfully')
+      setReopenModalOpen(false)
+      setReopenReason('')
+      await load()
+      onChanged?.()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reopen ticket')
+    } finally {
+      setBusyStatus(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
@@ -84,8 +112,16 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
   const resolvedOrClosed = ticket.status === 'Resolved' || ticket.status === 'Closed'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/50 backdrop-blur-sm sm:p-4">
-      <div className="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl sm:max-w-4xl sm:rounded-xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/50 backdrop-blur-sm sm:p-4 overscroll-contain"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && typeof onClose === 'function') onClose()
+      }}
+    >
+      <div
+        className="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl sm:max-w-4xl sm:rounded-xl overscroll-contain"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
           <div>
@@ -97,8 +133,29 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
             <p className="mt-1 text-sm font-medium text-slate-600">{ticket.subject}</p>
           </div>
           <div className="flex items-center gap-2">
-            {!resolvedOrClosed && <Button size="sm" variant="secondary" disabled={busyStatus} onClick={() => changeStatus('Resolved')}>Mark Resolved</Button>}
-            {ticket.status === 'Resolved' && <Button size="sm" variant="secondary" disabled={busyStatus} onClick={() => changeStatus('Closed')}>Close</Button>}
+            {!resolvedOrClosed && (
+              <Button size="sm" variant="secondary" disabled={busyStatus} onClick={() => changeStatus('Resolved')}>
+                Mark Resolved
+              </Button>
+            )}
+            {ticket.status === 'Resolved' && (
+              <Button size="sm" variant="secondary" disabled={busyStatus} onClick={() => changeStatus('Closed')}>
+                Close
+              </Button>
+            )}
+            {resolvedOrClosed && canReopen && (
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={busyStatus}
+                onClick={() => setReopenModalOpen(true)}
+                className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                title="Reopen ticket for further follow-up"
+              >
+                <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                <span>Reopen Ticket</span>
+              </Button>
+            )}
             <button onClick={onClose} className="ml-2 rounded-full p-2 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700">✕</button>
           </div>
         </div>
@@ -153,7 +210,26 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
               )}
             </div>
 
-            {!closed && (
+            {closed ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-6 py-3.5 text-xs text-slate-500">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">lock</span>
+                  <span>This ticket is closed. Direct thread updates are locked.</span>
+                </div>
+                {canReopen && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    disabled={busyStatus}
+                    onClick={() => setReopenModalOpen(true)}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                    <span>Reopen for Follow-up</span>
+                  </Button>
+                )}
+              </div>
+            ) : (
               <div className="flex gap-3 border-t border-slate-200 bg-slate-50 p-4">
                 <input
                   type="text" placeholder="Add a note or update…"
@@ -166,6 +242,64 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
           </div>
         </div>
       </div>
+
+      {/* Reopen Ticket Confirmation Modal */}
+      {reopenModalOpen && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs overscroll-contain"
+          onClick={() => setReopenModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 mb-2 text-slate-900">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <span className="material-symbols-outlined text-[20px]">restart_alt</span>
+              </span>
+              <h3 className="text-base font-semibold">Reopen Support Ticket</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Reopening <strong className="text-slate-800 font-mono">{ticket.ticketId}</strong> will transition status back to <strong className="text-blue-600">Open</strong> and allow further follow-up and notes.
+            </p>
+            <form onSubmit={handleReopen} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Follow-up Reason / Remarks
+                </label>
+                <textarea
+                  rows={3}
+                  value={reopenReason}
+                  onChange={(e) => setReopenReason(e.target.value)}
+                  placeholder="Specify why this ticket is being reopened (e.g. Issue recurring, customer requested review)..."
+                  className="w-full rounded-xl border border-slate-300 p-3 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
+                />
+              </div>
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={busyStatus}
+                  onClick={() => setReopenModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  loading={busyStatus}
+                  className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                  Confirm Reopen
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, Children } from 'react'
 import { STATUS_COLORS, titleCase } from '../lib/format.js'
+import { useBodyScrollLock, lockBodyScroll } from '../hooks/useBodyScrollLock.js'
+export { useBodyScrollLock, lockBodyScroll }
 
 // --- Buttons ---
 export function Button({ variant = 'primary', size = 'md', className = '', children, ...props }) {
@@ -82,7 +84,7 @@ export function ExportMenu({ items = [], label = 'Export', disabled = false, loa
 
 // --- Inputs ---
 const fieldCls =
-  'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 shadow-xs outline-none transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/50 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400'
+  'w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 shadow-xs outline-none transition-all duration-200 hover:border-blue-400 hover:bg-slate-50/70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200'
 
 export function renderFieldLabel(label, required) {
   if (!label) return null
@@ -154,26 +156,275 @@ export function Textarea({ label, required, className = '', ...props }) {
   )
 }
 
-export function Select({ label, children, required, className = '', containerClassName = '', ...props }) {
+export function Select({ label, children, required, className = '', containerClassName = '', error, ...props }) {
   const isRequired = required || props.required
   return (
     <label className={`block ${containerClassName}`}>
       {renderFieldLabel(label, isRequired)}
-      <div className="relative">
+      <div className="group relative">
         <select
           required={isRequired}
-          className={`w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3.5 pr-9 py-2 text-sm text-slate-800 shadow-xs outline-none transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/50 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${className}`}
+          className={`w-full appearance-none rounded-xl border border-slate-300 bg-white pl-3.5 pr-10 py-2.5 text-sm font-medium text-slate-800 shadow-xs outline-none transition-all duration-200 cursor-pointer hover:border-blue-400 hover:bg-slate-50/70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200 ${className}`}
           {...props}
         >
           {children}
         </select>
-        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition-colors">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 transition-all duration-200 group-hover:text-blue-600 group-focus-within:text-blue-600 group-focus-within:rotate-180">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
           </svg>
         </span>
       </div>
+      {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
     </label>
+  )
+}
+
+// Redesigned modern Custom Dropdown Selection Menu with smooth animated open/close transitions,
+// clear hover/active states, clean borders, proper padding, and full keyboard/click-outside support.
+export function DropdownSelect({
+  label,
+  value,
+  onChange,
+  options = [],
+  children,
+  placeholder = 'Select option...',
+  required = false,
+  disabled = false,
+  className = '',
+  containerClassName = '',
+  error,
+}) {
+  const [open, setOpen] = useState(false)
+  const dropdownRef = useRef(null)
+
+  // Normalize options from either options prop or children (<option value="...">label</option>)
+  const normalizedOptions = useMemo(() => {
+    if (options && options.length > 0) {
+      return options.map((opt) => {
+        if (typeof opt === 'object' && opt !== null) {
+          return {
+            value: opt.value ?? '',
+            label: opt.label ?? String(opt.value ?? ''),
+            icon: opt.icon,
+            badge: opt.badge,
+            disabled: opt.disabled,
+          }
+        }
+        return { value: opt, label: String(opt) }
+      })
+    }
+    if (children) {
+      const list = []
+      Children.forEach(children, (child) => {
+        if (child && child.props) {
+          list.push({
+            value: child.props.value ?? '',
+            label: child.props.children ?? String(child.props.value ?? ''),
+            disabled: child.props.disabled,
+          })
+        }
+      })
+      return list
+    }
+    return []
+  }, [options, children])
+
+  const selectedOption = normalizedOptions.find((o) => String(o.value) === String(value))
+
+  useEffect(() => {
+    if (!open) return
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  const handleSelect = (val) => {
+    // Fire callback with synthetic or direct value
+    if (typeof onChange === 'function') {
+      onChange({ target: { value: val } })
+    }
+    setOpen(false)
+  }
+
+  return (
+    <div ref={dropdownRef} className={`relative ${containerClassName}`}>
+      {renderFieldLabel(label, required)}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={`group flex w-full items-center justify-between rounded-xl border bg-white px-3.5 py-2.5 text-left text-sm font-medium shadow-xs outline-none transition-all duration-200 cursor-pointer ${
+          open
+            ? 'border-blue-600 ring-4 ring-blue-500/15'
+            : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50/70'
+        } ${disabled ? 'cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200' : 'text-slate-800'} ${className}`}
+      >
+        <div className="flex items-center gap-2 truncate pr-2">
+          {selectedOption?.icon && (
+            <span className="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-blue-500 transition-colors">
+              {selectedOption.icon}
+            </span>
+          )}
+          <span className={selectedOption ? 'text-slate-900 font-medium truncate' : 'text-slate-400 truncate'}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+          {selectedOption?.badge && (
+            <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+              {selectedOption.badge}
+            </span>
+          )}
+        </div>
+        <span
+          className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform duration-200 ease-out group-hover:text-blue-600 ${
+            open ? 'rotate-180 text-blue-600' : ''
+          }`}
+        >
+          expand_more
+        </span>
+      </button>
+
+      {/* Dropdown Menu Panel with smooth open/close transition */}
+      <div
+        className={`absolute z-50 mt-1.5 w-full min-w-[180px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl transition-all duration-200 ease-out origin-top ${
+          open
+            ? 'opacity-100 scale-100 translate-y-0 visible'
+            : 'opacity-0 scale-95 -translate-y-1 invisible pointer-events-none'
+        }`}
+      >
+        <div className="max-h-60 overflow-y-auto space-y-0.5">
+          {normalizedOptions.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-slate-400 text-center">No options available</div>
+          ) : (
+            normalizedOptions.map((opt) => {
+              const isSelected = String(opt.value) === String(value)
+              return (
+                <button
+                  key={String(opt.value)}
+                  type="button"
+                  disabled={opt.disabled}
+                  onClick={() => handleSelect(opt.value)}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-left transition duration-150 cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-50 font-semibold text-blue-700'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 active:bg-blue-50/50'
+                  } ${opt.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    {opt.icon && (
+                      <span className={`material-symbols-outlined text-[18px] ${isSelected ? 'text-blue-600' : 'text-slate-400'}`}>
+                        {opt.icon}
+                      </span>
+                    )}
+                    <span className="truncate">{opt.label}</span>
+                  </div>
+                  {isSelected && (
+                    <span className="material-symbols-outlined text-[18px] text-blue-600 shrink-0">
+                      check
+                    </span>
+                  )}
+                  {opt.badge && !isSelected && (
+                    <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                      {opt.badge}
+                    </span>
+                  )}
+                </button>
+              )
+            })
+          )}
+        </div>
+      </div>
+      {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
+    </div>
+  )
+}
+
+// Action dropdown menu with smooth open/close animations, icons, and clear hover/active states.
+export function ActionDropdown({ label = 'Actions', items = [], align = 'right', className = '', size = 'sm' }) {
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    const handleKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [open])
+
+  return (
+    <div ref={menuRef} className={`relative inline-block text-left ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white font-medium text-slate-700 shadow-xs transition-all duration-200 hover:border-blue-400 hover:bg-slate-50 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:bg-slate-100 cursor-pointer ${
+          size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3 py-1.5 text-sm'
+        }`}
+      >
+        <span>{label}</span>
+        <span className={`material-symbols-outlined text-[16px] text-slate-400 transition-transform duration-200 ${open ? 'rotate-180 text-blue-600' : ''}`}>
+          expand_more
+        </span>
+      </button>
+
+      <div
+        className={`absolute z-50 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl transition-all duration-200 ease-out origin-top ${
+          align === 'left' ? 'left-0' : 'right-0'
+        } ${
+          open
+            ? 'opacity-100 scale-100 translate-y-0 visible'
+            : 'opacity-0 scale-95 -translate-y-1 invisible pointer-events-none'
+        }`}
+      >
+        <div className="space-y-0.5">
+          {items.map((it, idx) => (
+            <button
+              key={it.key || idx}
+              type="button"
+              disabled={it.disabled}
+              onClick={() => {
+                setOpen(false)
+                it.onClick?.()
+              }}
+              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition duration-150 text-left cursor-pointer ${
+                it.danger
+                  ? 'text-red-600 hover:bg-red-50 hover:text-red-700'
+                  : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              {it.icon && (
+                <span className={`material-symbols-outlined text-[16px] ${it.danger ? 'text-red-500' : 'text-slate-400'}`}>
+                  {it.icon}
+                </span>
+              )}
+              <span className="flex-1 truncate">{it.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -456,11 +707,17 @@ export function Pagination({ meta, onPage, onPageSize, pageSizeOptions = [10, 20
 
 // --- Modal ---
 export function Modal({ open, onClose, title, children, footer, wide = false }) {
+  useBodyScrollLock(open)
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 pt-20">
+    <div
+      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 pt-20 overscroll-contain backdrop-blur-xs"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && typeof onClose === 'function') onClose()
+      }}
+    >
       <div
-        className={`w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-slate-200 bg-white shadow-2xl`}
+        className={`w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-slate-200 bg-white shadow-2xl overscroll-contain`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">

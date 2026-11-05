@@ -437,7 +437,11 @@ export const ticketsApi = {
   get: (id) => api.get(`/tickets/${id}`),
   create: (body) => api.post('/tickets', body),
   update: (id, body) => api.patch(`/tickets/${id}`, body),
-  changeStatus: (id, status) => api.patch(`/tickets/${id}/status`, { status }),
+  changeStatus: (id, status, payload = {}) => {
+    const body = typeof status === 'object' ? status : { status, ...payload }
+    return api.patch(`/tickets/${id}/status`, body)
+  },
+  reopen: (id, note = '') => api.patch(`/tickets/${id}/status`, { status: 'Open', note }),
   assign: (id, assignedTo) => api.patch(`/tickets/${id}/assign`, { assignedTo }),
   addNote: (id, note) => api.post(`/tickets/${id}/notes`, { note }),
 }

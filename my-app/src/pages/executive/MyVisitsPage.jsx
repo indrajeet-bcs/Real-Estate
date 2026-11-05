@@ -130,7 +130,15 @@ export default function MyVisitsPage() {
     return sorted
   }, [rows, status, project, builder, visitType, dateRange, search, sort]) // eslint-disable-line
 
-  function call(r) { window.location.href = `tel:${(r.customer?.mobile || '').replace(/\s/g, '')}` }
+  function call(r) {
+    const rawNumber = String(r?.customer?.mobile || r?.mobile || '').trim()
+    const cleanNumber = rawNumber.replace(/[^\d+]/g, '')
+    if (!cleanNumber) {
+      toast.error('No phone number available for this contact.')
+      return
+    }
+    window.location.href = `tel:${cleanNumber}`
+  }
   function navigateTo(r) {
     const q = r.meetingPoint || r.project?.location || r.project?.name || ''
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}`, '_blank')

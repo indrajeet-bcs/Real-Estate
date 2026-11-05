@@ -64,7 +64,7 @@ export default function CustomerProfilePage() {
   if (error) return <ErrorState message={error} onRetry={refetch} />
 
   const { customer, followUps, visits, bookings } = data
-  const editable = can('customer', 'edit')
+  const editable = can('customer', 'edit') || can('lead', 'edit')
   const canTransfer = can('lead', 'assign') // Admin & Sub-Admin
 
   const handleBack = () => {

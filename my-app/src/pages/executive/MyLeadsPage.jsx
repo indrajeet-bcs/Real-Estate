@@ -1,8 +1,14 @@
+export function getCleanPhoneNumber(val) {
+  if (!val) return ''
+  const str = String(val).trim()
+  return str.replace(/[^\d+]/g, '')
+}
 import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { customersApi, projectsApi, followupsApi, visitsApi, leadTransfersApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { formatDate, titleCase } from '../../lib/format.js'
 import { LEAD_STAGES, LEAD_STAGE_LABELS } from '../../lib/constants.js'
 import {
@@ -42,6 +48,9 @@ const stageLabel = (s) => LEAD_STAGE_LABELS[s] || titleCase(s)
 export default function MyLeadsPage() {
   const navigate = useNavigate()
   const toast = useToast()
+  const { can } = useAuth()
+  const canCreateLead = can('lead', 'create') || can('customer', 'create')
+  const canEditLead = can('lead', 'edit') || can('customer', 'edit')
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -152,73 +161,90 @@ export default function MyLeadsPage() {
   }, [rows, status, source, priority, project, dateRange, search, sort]) // eslint-disable-line
 
   async function quickStage(r, next) {
+    if (!canEditLead) {
+      toast.error('You do not have permission to edit leads.')
+      return
+    }
     try { await customersApi.changeStatus(r._id, { status: next }); toast.success('Stage updated'); refetch() }
     catch (err) { toast.error(err.response?.data?.message || 'Failed') }
   }
 
   function call(r) {
     if (!r) return
-    const rawNumber = String(r.mobile || r.phone || '').trim()
-    const cleanNumber = rawNumber.replace(/[^\d+]/g, '')
+    const cleanNumber = getCleanPhoneNumber(r.mobile || r.phone)
     if (!cleanNumber) {
       toast.error(`No phone number available for ${r.name || 'this lead'}.`)
       return
     }
 
-    // Auto-copy to clipboard for easy pasting into desktop VoIP/softphone apps
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(cleanNumber).catch(() => {})
-    }
-
-    // Trigger standard tel: protocol handler
     try {
-      const a = document.createElement('a')
-      a.href = `tel:${cleanNumber}`
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      setTimeout(() => {
-        try { document.body.removeChild(a) } catch (_) {}
-      }, 100)
-    } catch (_) {
-      window.location.href = `tel:${cleanNumber}`
-    }
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(cleanNumber).catch(() => {})
+      }
+    } catch (_) {}
 
-    toast.info(`Dialing ${cleanNumber} (${r.name}). Number copied to clipboard!`)
-    setCallModalFor(r)
+    toast.success(`Launching dialer for ${cleanNumber} (${r.name}). Number copied to clipboard!`)
+    window.location.href = `tel:${cleanNumber}`
   }
 
   const refetchAll = () => { refetch(); refetchReq() }
 
   const columns = [
-    { key: 'name', header: 'Lead', render: (r) => (
-      <div className="min-w-[9rem]">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); navigate(`/executive/leads/${r._id}`) }}
-          className="group flex items-center gap-1 text-left font-semibold text-slate-900 hover:text-blue-600 hover:underline cursor-pointer"
-          title="Open Full Profile"
-        >
-          <span>{r.name}</span>
-          <span className="material-symbols-outlined text-[13px] opacity-0 group-hover:opacity-100 transition-opacity text-blue-600">open_in_new</span>
-        </button>
-        <div className="text-xs text-slate-500">{r.mobile}</div>
-        {pendingByCustomer[String(r._id)] && <span className="mt-0.5 inline-block rounded bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">Transfer pending</span>}
-      </div>
-    ) },
+    { key: 'name', header: 'Lead', render: (r) => {
+      const cleanNum = getCleanPhoneNumber(r.mobile || r.phone)
+      return (
+        <div className="min-w-[9rem]">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); navigate(`/executive/leads/${r._id}`) }}
+            className="group flex items-center gap-1 text-left font-semibold text-slate-900 hover:text-blue-600 hover:underline cursor-pointer"
+            title="Open Full Profile"
+          >
+            <span>{r.name}</span>
+            <span className="material-symbols-outlined text-[13px] opacity-0 group-hover:opacity-100 transition-opacity text-blue-600">open_in_new</span>
+          </button>
+          {cleanNum ? (
+            <a
+              href={`tel:${cleanNum}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                try {
+                  if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(cleanNum).catch(() => {})
+                } catch (_) {}
+                toast.success(`Launching dialer for ${cleanNum} (${r.name})...`)
+              }}
+              className="text-xs text-slate-600 hover:text-emerald-700 hover:underline inline-flex items-center gap-1 mt-0.5 cursor-pointer font-medium"
+              title={`Click to call ${cleanNum}`}
+            >
+              <span className="material-symbols-outlined text-[13px] text-emerald-600">call</span>
+              <span>{r.mobile}</span>
+            </a>
+          ) : (
+            <div className="text-xs text-slate-400 mt-0.5">{r.mobile || 'No phone number'}</div>
+          )}
+          {pendingByCustomer[String(r._id)] && <span className="mt-0.5 inline-block rounded bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">Transfer pending</span>}
+        </div>
+      )
+    } },
     { key: 'budget', header: 'Budget', render: (r) => inr(r.budgetMax || r.budgetMin) },
     { key: 'config', header: 'Configuration', render: (r) => r.configuration || '—' },
     { key: 'project', header: 'Project Interest', render: (r) => leadProject(r) || '—' },
     { key: 'source', header: 'Source', render: (r) => titleCase(r.source || '—') },
     { key: 'stage', header: 'Current Stage', render: (r) => (
-      <select
-        value={r.status}
-        onChange={(e) => { e.stopPropagation(); quickStage(r, e.target.value) }}
-        onClick={(e) => e.stopPropagation()}
-        className="rounded border border-slate-300 px-1.5 py-1 text-xs"
-      >
-        {LEAD_STAGES.map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
-      </select>
+      canEditLead ? (
+        <select
+          value={r.status}
+          onChange={(e) => { e.stopPropagation(); quickStage(r, e.target.value) }}
+          onClick={(e) => e.stopPropagation()}
+          className="rounded border border-slate-300 px-1.5 py-1 text-xs bg-white cursor-pointer hover:border-slate-400 focus:border-blue-500"
+        >
+          {LEAD_STAGES.map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
+        </select>
+      ) : (
+        <span className="text-xs font-semibold text-slate-700 bg-slate-100 rounded border border-slate-200 px-2 py-0.5">
+          {stageLabel(r.status)}
+        </span>
+      )
     ) },
     { key: 'next', header: 'Next Follow-up', render: (r) => {
       if (!r.nextFollowUp) return <span className="text-slate-400">—</span>
@@ -229,13 +255,49 @@ export default function MyLeadsPage() {
     } },
     { key: 'assigned', header: 'Assigned', render: (r) => formatDate(r.assignedAt || r.createdAt) },
     { key: 'priority', header: 'Priority', render: (r) => <span className={`rounded border px-2 py-0.5 text-xs font-medium ${PRIORITY_CLS[r.priority || 'medium']}`}>{titleCase(r.priority || 'medium')}</span> },
-    { key: 'actions', header: '', render: (r) => (
-      <div className="flex items-center justify-end gap-1.5">
-        <IconBtn title="Quick Summary Preview" icon={ICONS.eye} onClick={(e) => { e.stopPropagation(); setPreviewFor(r) }} />
-        <IconBtn title="Call" icon={ICONS.phone} onClick={(e) => { e.stopPropagation(); call(r) }} />
-        <IconBtn title="Actions" icon={ICONS.kebab} onClick={(e) => { e.stopPropagation(); setSheetFor(r) }} />
-      </div>
-    ) },
+    { key: 'actions', header: '', render: (r) => {
+      const cleanNum = getCleanPhoneNumber(r.mobile || r.phone)
+      return (
+        <div className="flex items-center justify-end gap-1.5">
+          <IconBtn title="Quick Summary Preview" icon={ICONS.eye} onClick={(e) => { e.stopPropagation(); setPreviewFor(r) }} />
+          {cleanNum ? (
+            <a
+              href={`tel:${cleanNum}`}
+              title={`Call ${r.name} (${cleanNum})`}
+              aria-label={`Call ${r.name}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                try {
+                  if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(cleanNum).catch(() => {})
+                } catch (_) {}
+                toast.success(`Launching dialer for ${cleanNum} (${r.name}). Number copied to clipboard!`)
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 cursor-pointer shadow-xs"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                {ICONS.phone}
+              </svg>
+            </a>
+          ) : (
+            <button
+              type="button"
+              title="No phone number available"
+              aria-label="No phone number"
+              onClick={(e) => {
+                e.stopPropagation()
+                toast.error(`No phone number available for ${r.name || 'this lead'}.`)
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-300 transition hover:bg-slate-50 cursor-not-allowed"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                {ICONS.phone}
+              </svg>
+            </button>
+          )}
+          <IconBtn title="Actions" icon={ICONS.kebab} onClick={(e) => { e.stopPropagation(); setSheetFor(r) }} />
+        </div>
+      )
+    } },
   ]
 
   return (
@@ -243,7 +305,7 @@ export default function MyLeadsPage() {
       <PageHeader
         title="My Leads"
         subtitle="Manage your assigned leads, track progress, schedule follow-ups, and convert qualified leads into customers."
-        actions={<Button onClick={() => setAdding(true)}>+ Add Lead</Button>}
+        actions={canCreateLead ? <Button onClick={() => setAdding(true)}>+ Add Lead</Button> : null}
       />
 
       {/* Top Summary Cards */}
@@ -254,57 +316,113 @@ export default function MyLeadsPage() {
         <StatCard label="Qualified Leads" value={kpis.qualified} />
       </div>
 
-      {/* Filters & Search */}
-      <Card className="mb-4 p-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
-          <div className="col-span-2 md:col-span-1">
-            <Input label="Search" placeholder="Name or mobile" value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Filters & Search Panel */}
+      <Card className="mb-5 overflow-hidden border border-slate-200 bg-white p-4.5 shadow-xs">
+        {/* Header bar of filter panel */}
+        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[20px] text-blue-600">tune</span>
+            <span className="text-sm font-semibold text-slate-800">Filter & Refine Leads</span>
+            {hasActiveFilters && (
+              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                Filters Active
+              </span>
+            )}
           </div>
-          <Select label="Lead Status" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">All</option>
-            {LEAD_STAGES.map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
-          </Select>
-          <Select label="Source" value={source} onChange={(e) => setSource(e.target.value)}>
-            <option value="all">All</option>
-            {sourceOptions.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}
-          </Select>
-          <Select label="Project Interest" value={project} onChange={(e) => setProject(e.target.value)}>
-            <option value="all">All</option>
-            {(projects || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
-          </Select>
-          <Select label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)}>
-            <option value="all">All</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </Select>
-          <Select label="Date Range" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-            <option value="all">All time</option>
-            <option value="today">Assigned today</option>
-            <option value="week">Last 7 days</option>
-            <option value="month">Last 30 days</option>
-          </Select>
-          <Select label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="recently_assigned">Recently Assigned</option>
-            <option value="latest_followup">Next Follow-up</option>
-            <option value="name">Name (A–Z)</option>
-          </Select>
+          <div className="flex items-center gap-2.5 text-xs text-slate-500">
+            <span>Showing <strong className="text-slate-800">{filtered.length}</strong> of {rows.length} leads</span>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 transition duration-150 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">filter_alt_off</span>
+                Clear Filters
+              </button>
+            )}
+          </div>
         </div>
-        {hasActiveFilters && (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-            <span className="text-xs text-slate-500">
-              Showing <span className="font-semibold text-slate-800">{filtered.length}</span> of {rows.length} leads (filters active)
-            </span>
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-              Clear Filters
-            </button>
+
+        {/* Filter Inputs Grid with balanced alignment and spacing */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 items-end">
+          <div className="sm:col-span-2 md:col-span-3 lg:col-span-2 xl:col-span-1">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Search
+              </span>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                  <span className="material-symbols-outlined text-[18px]">search</span>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search lead name or mobile…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm text-slate-800 shadow-xs outline-none transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/50 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title="Clear search"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                )}
+              </div>
+            </label>
           </div>
-        )}
+
+          <div>
+            <Select label="Lead Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="all">All Stages</option>
+              {LEAD_STAGES.map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
+            </Select>
+          </div>
+
+          <div>
+            <Select label="Source" value={source} onChange={(e) => setSource(e.target.value)}>
+              <option value="all">All Sources</option>
+              {sourceOptions.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}
+            </Select>
+          </div>
+
+          <div>
+            <Select label="Project" value={project} onChange={(e) => setProject(e.target.value)}>
+              <option value="all">All Projects</option>
+              {(projects || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+            </Select>
+          </div>
+
+          <div>
+            <Select label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)}>
+              <option value="all">All Priorities</option>
+              <option value="high">High Priority</option>
+              <option value="medium">Medium Priority</option>
+              <option value="low">Low Priority</option>
+            </Select>
+          </div>
+
+          <div>
+            <Select label="Assigned Date" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+              <option value="all">All Time</option>
+              <option value="today">Assigned Today</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">Last 30 Days</option>
+            </Select>
+          </div>
+
+          <div>
+            <Select label="Sort By" value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="recently_assigned">Recently Assigned</option>
+              <option value="latest_followup">Next Follow-up</option>
+              <option value="name">Name (A–Z)</option>
+            </Select>
+          </div>
+        </div>
       </Card>
 
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (
@@ -363,6 +481,7 @@ export default function MyLeadsPage() {
         <ActionSheet
           lead={sheetFor}
           hasPendingTransfer={pendingByCustomer[String(sheetFor._id)]}
+          canEdit={canEditLead}
           onClose={() => setSheetFor(null)}
           onCall={() => { const r = sheetFor; setSheetFor(null); call(r) }}
           onPreview={() => { const r = sheetFor; setSheetFor(null); setPreviewFor(r) }}
@@ -424,14 +543,23 @@ function LeadSummaryModal({ lead, projects = [], onClose, onViewProfile, onCall,
         <div className="flex w-full items-center justify-between gap-3">
           <Button variant="secondary" onClick={onClose}>Close</Button>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onCall}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px] text-emerald-600">call</span>
-              <span>Call</span>
-            </button>
+            {getCleanPhoneNumber(lead?.mobile || lead?.phone) ? (
+              <a
+                href={`tel:${getCleanPhoneNumber(lead?.mobile || lead?.phone)}`}
+                onClick={() => {
+                  const num = getCleanPhoneNumber(lead?.mobile || lead?.phone)
+                  try {
+                    if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(num).catch(() => {})
+                  } catch (_) {}
+                  toast.success(`Launching dialer for ${num} (${lead.name})...`)
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                title={`Call ${lead.name}`}
+              >
+                <span className="material-symbols-outlined text-[16px] text-emerald-600">call</span>
+                <span>Call ({lead.mobile})</span>
+              </a>
+            ) : null}
             {onFollowUp && (
               <Button size="sm" variant="secondary" onClick={onFollowUp}>
                 + Follow-up
@@ -536,15 +664,30 @@ function LeadSummaryModal({ lead, projects = [], onClose, onViewProfile, onCall,
 }
 
 // ─── Per-row action sheet (spec §Leads Table · Actions) ─────────────────────────
-function ActionSheet({ lead, hasPendingTransfer, onClose, onCall, onPreview, onView, onEdit, onFollowUp, onVisit, onConvert, onTransfer }) {
-  const canConvert = lead.status === 'qualified'
+function ActionSheet({ lead, hasPendingTransfer, canEdit = true, onClose, onCall, onPreview, onView, onEdit, onFollowUp, onVisit, onConvert, onTransfer }) {
+  const canConvert = lead?.status === 'qualified'
+  const cleanNum = getCleanPhoneNumber(lead?.mobile || lead?.phone)
+  const toast = useToast()
+
   const actions = [
     {
-      label: `Call ${lead.name}`,
+      label: `Call ${lead?.name || 'Lead'}`,
       icon: 'call',
-      description: lead.mobile ? `Dial ${lead.mobile} or open quick dialer` : 'No phone number available',
-      onClick: onCall,
-      disabled: !lead.mobile,
+      href: cleanNum ? `tel:${cleanNum}` : undefined,
+      description: cleanNum ? `Dial ${lead.mobile} instantly via device dialer` : 'No phone number available',
+      onClick: (e) => {
+        if (!cleanNum) {
+          e.preventDefault()
+          toast.error(`No phone number available for ${lead?.name || 'this lead'}.`)
+          return
+        }
+        try {
+          if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(cleanNum).catch(() => {})
+        } catch (_) {}
+        toast.success(`Launching dialer for ${cleanNum} (${lead.name}). Number copied to clipboard!`)
+        onClose()
+      },
+      disabled: !cleanNum,
     },
     {
       label: 'View Full Profile',
@@ -561,8 +704,15 @@ function ActionSheet({ lead, hasPendingTransfer, onClose, onCall, onPreview, onV
     {
       label: 'Edit Lead',
       icon: 'edit',
-      description: 'Update lead contact info, budget, project & stage',
-      onClick: onEdit,
+      description: canEdit ? 'Update lead contact info, budget, project & stage' : 'Permission required to edit lead details',
+      onClick: () => {
+        if (!canEdit) {
+          toast.error('You do not have permission to edit leads.')
+          return
+        }
+        onEdit()
+      },
+      disabled: !canEdit,
     },
     {
       label: 'Schedule Follow-up',
@@ -592,29 +742,51 @@ function ActionSheet({ lead, hasPendingTransfer, onClose, onCall, onPreview, onV
     },
   ]
   return (
-    <Modal open onClose={onClose} title={lead.name}
+    <Modal open onClose={onClose} title={lead?.name || 'Lead Options'}
       footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
     >
-      <p className="mb-3.5 text-xs text-slate-500">{lead.mobile} · {stageLabel(lead.status)}</p>
+      <p className="mb-3.5 text-xs text-slate-500">{lead?.mobile || 'No mobile'} · {stageLabel(lead?.status)}</p>
       <div className="grid grid-cols-1 gap-2.5">
-        {actions.map((a) => (
-          <button
-            key={a.label}
-            onClick={a.onClick}
-            disabled={a.disabled}
-            className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
-              a.disabled
-                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
-                : 'border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 cursor-pointer'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px] text-blue-600 mt-0.5">{a.icon}</span>
-            <div>
-              <div className="text-sm font-semibold text-slate-800">{a.label}</div>
-              {a.description && <div className="text-xs text-slate-500 mt-0.5">{a.description}</div>}
-            </div>
-          </button>
-        ))}
+        {actions.map((a) => {
+          if (a.href) {
+            return (
+              <a
+                key={a.label}
+                href={a.disabled ? undefined : a.href}
+                onClick={a.onClick}
+                className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+                  a.disabled
+                    ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400 pointer-events-none'
+                    : 'border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/70 cursor-pointer'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px] text-emerald-600 mt-0.5">{a.icon}</span>
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">{a.label}</div>
+                  {a.description && <div className="text-xs text-slate-500 mt-0.5">{a.description}</div>}
+                </div>
+              </a>
+            )
+          }
+          return (
+            <button
+              key={a.label}
+              onClick={a.onClick}
+              disabled={a.disabled}
+              className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+                a.disabled
+                  ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
+                  : 'border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 cursor-pointer'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px] text-blue-600 mt-0.5">{a.icon}</span>
+              <div>
+                <div className="text-sm font-semibold text-slate-800">{a.label}</div>
+                {a.description && <div className="text-xs text-slate-500 mt-0.5">{a.description}</div>}
+              </div>
+            </button>
+          )
+        })}
       </div>
     </Modal>
   )

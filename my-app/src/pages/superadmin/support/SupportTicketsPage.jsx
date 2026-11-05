@@ -4,7 +4,7 @@ import { useFetch } from '../../../hooks/useFetch.js'
 import { useDebounce } from '../../../hooks/useDebounce.js'
 import { useToast } from '../../../context/ToastContext.jsx'
 import { formatDate } from '../../../lib/format.js'
-import { PageHeader, Button, Input, Select, Pagination, Loader, ErrorState, Card, Modal, Textarea } from '../../../components/ui.jsx'
+import { PageHeader, Button, Input, Select, DropdownSelect, ActionDropdown, Pagination, Loader, ErrorState, Card, Modal, Textarea } from '../../../components/ui.jsx'
 
 function StatusBadge({ status }) {
   const colors = {
@@ -127,47 +127,99 @@ export default function SupportTicketsPage() {
         ))}
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-wrap gap-3 items-end bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex-1 min-w-[200px]">
-          <Input 
-            placeholder="Search by Ticket ID or Subject..." 
-            value={searchInput} 
-            onChange={(e) => { setPage(1); setSearchInput(e.target.value) }} 
-          />
+      {/* Search & Filters with clean alignment, clear borders, and proper padding */}
+      <Card className="overflow-hidden border border-slate-200 bg-white p-5 shadow-xs">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[20px] text-blue-600">tune</span>
+            <span className="text-sm font-semibold text-slate-800">Filter & Refine Support Tickets</span>
+            {(searchInput || filters.status !== 'all' || filters.priority !== 'all' || filters.category !== 'all' || filters.firm !== 'all') && (
+              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                Filters Active
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span>Showing <strong className="text-slate-800">{tickets.length}</strong> of {meta?.total ?? tickets.length} tickets</span>
+            {(searchInput || filters.status !== 'all' || filters.priority !== 'all' || filters.category !== 'all' || filters.firm !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('')
+                  setPage(1)
+                  setFilters({ status: 'all', priority: 'all', category: 'all', firm: 'all' })
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 transition duration-150 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">filter_alt_off</span>
+                Clear Filters
+              </button>
+            )}
+          </div>
         </div>
-        <div className="w-40">
-          <Select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
-            <option value="all">All Statuses</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Waiting for Customer">Waiting for Customer</option>
-            <option value="Resolved">Resolved</option>
-            <option value="Closed">Closed</option>
-          </Select>
+
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 items-end">
+          <div className="sm:col-span-2 md:col-span-1 lg:col-span-1">
+            <Input 
+              label="Search"
+              placeholder="Ticket ID or Subject..." 
+              value={searchInput} 
+              onChange={(e) => { setPage(1); setSearchInput(e.target.value) }} 
+            />
+          </div>
+          <div>
+            <DropdownSelect
+              label="Status"
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              options={[
+                { value: 'all', label: 'All Statuses' },
+                { value: 'Open', label: 'Open' },
+                { value: 'In Progress', label: 'In Progress' },
+                { value: 'Waiting for Customer', label: 'Waiting for Customer' },
+                { value: 'Resolved', label: 'Resolved' },
+                { value: 'Closed', label: 'Closed' },
+              ]}
+            />
+          </div>
+          <div>
+            <DropdownSelect
+              label="Priority"
+              value={filters.priority}
+              onChange={(e) => handleFilterChange('priority', e.target.value)}
+              options={[
+                { value: 'all', label: 'All Priorities' },
+                { value: 'Low', label: 'Low' },
+                { value: 'Medium', label: 'Medium' },
+                { value: 'High', label: 'High' },
+                { value: 'Critical', label: 'Critical' },
+              ]}
+            />
+          </div>
+          <div>
+            <DropdownSelect
+              label="Category"
+              value={filters.category}
+              onChange={(e) => handleFilterChange('category', e.target.value)}
+              options={[
+                { value: 'all', label: 'All Categories' },
+                ...(categories || []).map(c => ({ value: c._id, label: c.name })),
+              ]}
+            />
+          </div>
+          <div>
+            <DropdownSelect
+              label="Company"
+              value={filters.firm}
+              onChange={(e) => handleFilterChange('firm', e.target.value)}
+              options={[
+                { value: 'all', label: 'All Companies' },
+                ...(firms || []).map(f => ({ value: f._id, label: f.name })),
+              ]}
+            />
+          </div>
         </div>
-        <div className="w-32">
-          <Select value={filters.priority} onChange={(e) => handleFilterChange('priority', e.target.value)}>
-            <option value="all">All Priorities</option>
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-            <option value="Critical">Critical</option>
-          </Select>
-        </div>
-        <div className="w-40">
-          <Select value={filters.category} onChange={(e) => handleFilterChange('category', e.target.value)}>
-            <option value="all">All Categories</option>
-            {(categories || []).map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-          </Select>
-        </div>
-        <div className="w-40">
-          <Select value={filters.firm} onChange={(e) => handleFilterChange('firm', e.target.value)}>
-            <option value="all">All Companies</option>
-            {(firms || []).map(f => <option key={f._id} value={f._id}>{f.name}</option>)}
-          </Select>
-        </div>
-      </div>
+      </Card>
 
       {/* Table */}
       {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (
@@ -208,22 +260,21 @@ export default function SupportTicketsPage() {
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="secondary" onClick={() => openModal('view', t)}>View</Button>
-                          <Select 
-                            className="!py-1 !text-xs !w-24 bg-white"
-                            value=""
-                            onChange={(e) => {
-                              if (e.target.value === 'status') openModal('status', t)
-                              if (e.target.value === 'note') openModal('note', t)
-                              if (e.target.value === 'reply') handleAction('reply')
-                              if (e.target.value === 'assign') openModal('assign', t)
-                            }}
-                          >
-                            <option value="" disabled>Actions...</option>
-                            <option value="reply">Reply</option>
-                            <option value="status">Change Status</option>
-                            <option value="assign">Assign</option>
-                            <option value="note">Add Note</option>
-                          </Select>
+                          <ActionDropdown
+                            label="Actions"
+                            items={[
+                              { key: 'reply', label: 'Reply', icon: 'reply', onClick: () => handleAction('reply') },
+                              { key: 'status', label: 'Change Status', icon: 'sync', onClick: () => openModal('status', t) },
+                              ...(t.status === 'Closed' || t.status === 'Resolved' ? [{
+                                key: 'reopen',
+                                label: 'Reopen Ticket',
+                                icon: 'restart_alt',
+                                onClick: () => openModal('status', t)
+                              }] : []),
+                              { key: 'assign', label: 'Assign', icon: 'person_add', onClick: () => openModal('assign', t) },
+                              { key: 'note', label: 'Add Note', icon: 'edit_note', onClick: () => openModal('note', t) },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>

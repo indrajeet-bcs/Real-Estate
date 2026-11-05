@@ -130,12 +130,17 @@ export default function SubAdminDashboard() {
           <SectionTitle action={<button onClick={() => navigate('/sub-admin/action')} className="text-xs text-blue-600 hover:underline">Open</button>}>Action Center</SectionTitle>
           <ul className="divide-y divide-slate-100 text-sm">
             {[
-              ['Leave approvals', actionCenter.pendingLeaves],
-              ['Bookings to confirm', actionCenter.reservedBookings],
-              ['Units on hold', actionCenter.heldUnits],
-              ['Unassigned leads', actionCenter.unassignedLeads],
-            ].map(([label, count]) => (
-              <li key={label} className="flex items-center justify-between py-2">
+              ['Discount approvals', actionCenter.pendingDiscounts, '/sub-admin/action?tab=discounts'],
+              ['Leave approvals', actionCenter.pendingLeaves, '/sub-admin/action?tab=leaves'],
+              ['Bookings to confirm', actionCenter.reservedBookings, '/sub-admin/action?tab=bookings'],
+              ['Units on hold', actionCenter.heldUnits, '/sub-admin/action?tab=inventory_holds'],
+              ['Unassigned leads', actionCenter.unassignedLeads, '/sub-admin/action?tab=lead_reassignments'],
+            ].map(([label, count, path]) => (
+              <li
+                key={label}
+                onClick={() => path && navigate(path)}
+                className={`flex items-center justify-between py-2 transition ${path ? 'cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded' : ''}`}
+              >
                 <span className="text-slate-700">{label}</span>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{count || 0}</span>
               </li>

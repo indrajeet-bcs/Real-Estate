@@ -134,7 +134,21 @@ export default function ExecutiveHome() {
                 {recentLeads.map((l) => (
                   <tr key={l._id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/executive/customers/${l._id}`)}>
                     <td className="py-2 pr-3 font-medium text-slate-800">{l.name}</td>
-                    <td className="py-2 pr-3 text-slate-600">{l.mobile}</td>
+                    <td className="py-2 pr-3 text-slate-600">
+                      {l.mobile ? (
+                        <a
+                          href={`tel:${String(l.mobile).replace(/[^\d+]/g, '')}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 font-medium text-slate-700 hover:text-emerald-700 hover:underline cursor-pointer"
+                          title={`Call ${l.name}`}
+                        >
+                          <span className="material-symbols-outlined text-[14px] text-emerald-600">call</span>
+                          <span>{l.mobile}</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="py-2 pr-3 text-slate-600">{titleCase(l.source)}</td>
                     <td className="py-2 pr-3"><StatusBadge status={l.status} /></td>
                     <td className="py-2 pr-3 text-slate-500">{formatDate(l.assignedAt || l.createdAt)}</td>

@@ -68,15 +68,21 @@ router.post(
   },
   ctrl.createCustomer
 )
-router.patch('/:id', validate(updateCustomerSchema), requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.updateCustomer)
+const requireCustomerOrLeadEdit = (req, res, next) => {
+  if (can(req.user, MODULES.CUSTOMER, 'edit') || can(req.user, MODULES.LEAD, 'edit')) {
+    return next()
+  }
+  return next(ApiError.forbidden('Not permitted to edit customer or lead'))
+}
 
-router.post('/:id/notes', validate(addNoteSchema), requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.addNote)
-router.post('/:id/interests', validate(interestSchema), requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.addInterest)
-router.delete('/:id/interests/:interestId', requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.removeInterest)
-router.post('/:id/documents', requirePermission(MODULES.CUSTOMER, 'edit'), upload.single('file'), ctrl.addDocument)
-router.patch('/:id/status', validate(changeStatusSchema), requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.changeStatus)
-router.post('/:id/reopen', requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.reopenCustomer)
+router.patch('/:id', validate(updateCustomerSchema), requireCustomerOrLeadEdit, ctrl.updateCustomer)
+router.post('/:id/notes', validate(addNoteSchema), requireCustomerOrLeadEdit, ctrl.addNote)
+router.post('/:id/interests', validate(interestSchema), requireCustomerOrLeadEdit, ctrl.addInterest)
+router.delete('/:id/interests/:interestId', requireCustomerOrLeadEdit, ctrl.removeInterest)
+router.post('/:id/documents', requireCustomerOrLeadEdit, upload.single('file'), ctrl.addDocument)
+router.patch('/:id/status', validate(changeStatusSchema), requireCustomerOrLeadEdit, ctrl.changeStatus)
+router.post('/:id/reopen', requireCustomerOrLeadEdit, ctrl.reopenCustomer)
 // Convert a qualified lead to a customer (Employee spec §Convert to Customer).
-router.post('/:id/convert', requirePermission(MODULES.CUSTOMER, 'edit'), ctrl.convertLead)
+router.post('/:id/convert', requireCustomerOrLeadEdit, ctrl.convertLead)
 
 export default router

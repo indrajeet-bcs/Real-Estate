@@ -1,6 +1,8 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { PageHeader, Card, StatCard, Button, Input, Select, StatusBadge, Pagination, Loader, ErrorState } from '../../components/ui.jsx'
+import { PageHeader, Card, StatCard, Button, Input, Select, DropdownSelect, StatusBadge, Pagination, Loader, ErrorState } from '../../components/ui.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { ROLES } from '../../lib/constants.js'
 import { ticketsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
@@ -17,6 +19,8 @@ const priorityCls = (p) =>
   p === 'Critical' ? 'bg-red-100 text-red-700' : p === 'High' ? 'bg-orange-100 text-orange-700' : p === 'Medium' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
 
 export default function CustomerSupportPage() {
+  const { user } = useAuth()
+  const canReopen = [ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SUPER_ADMIN].includes(user?.role)
   const [searchParams, setSearchParams] = useSearchParams()
   const TABS = [
     { key: 'dashboard', label: 'Dashboard' },
@@ -63,10 +67,10 @@ export default function CustomerSupportPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' && <DashboardTab kpis={kpis} tickets={tickets} loading={loading} onOpen={setOpenId} />}
+      {tab === 'dashboard' && <DashboardTab kpis={kpis} tickets={tickets} loading={loading} onOpen={setOpenId} onGoTickets={() => setTab('tickets')} canReopen={canReopen} />}
       {tab === 'tickets' && (
         <TicketsTab
-          tickets={tickets} meta={meta} loading={loading} error={error} refetch={refetch} onOpen={setOpenId}
+          tickets={tickets} meta={meta} loading={loading} error={error} refetch={refetch} onOpen={setOpenId} canReopen={canReopen}
           filters={{ search, status, priority }}
           setSearch={(v) => { setSearch(v); setPage(1) }}
           setStatus={(v) => { setStatus(v); setPage(1) }}
@@ -83,7 +87,7 @@ export default function CustomerSupportPage() {
   )
 }
 
-function DashboardTab({ kpis, tickets, loading, onOpen }) {
+function DashboardTab({ kpis, tickets, loading, onOpen, onGoTickets, canReopen }) {
   const highPriority = tickets.filter((t) => t.priority === 'High' || t.priority === 'Critical').slice(0, 8)
   const byCategory = useMemo(() => {
     const m = new Map()
@@ -127,21 +131,74 @@ function DashboardTab({ kpis, tickets, loading, onOpen }) {
         </Card>
       </div>
 
-      <Card className="p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">Recent High-Priority Tickets</h3>
-        {loading ? <Loader /> : highPriority.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">No high-priority tickets.</p> : (
+      {/* Support Main Page Recent Tickets with full View Action option */}
+      <Card className="overflow-hidden border border-slate-200 bg-white p-5 shadow-xs">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Recent High-Priority Tickets</h3>
+            <p className="text-xs text-slate-500">Urgent support tickets requiring immediate review & resolution.</p>
+          </div>
+          {typeof onGoTickets === 'function' && (
+            <Button size="sm" variant="ghost" onClick={onGoTickets} className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+              View All Tickets →
+            </Button>
+          )}
+        </div>
+        {loading ? <Loader /> : highPriority.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">No high-priority tickets.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                <th className="py-3 pr-4 font-medium">Ticket ID</th><th className="py-3 pr-4 font-medium">Subject</th><th className="py-3 pr-4 font-medium">Priority</th><th className="py-3 pr-4 font-medium">Status</th>
-              </tr></thead>
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 font-medium">Ticket ID</th>
+                  <th className="px-4 py-3 font-medium">Subject</th>
+                  <th className="px-4 py-3 font-medium">Category</th>
+                  <th className="px-4 py-3 font-medium">Priority</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Created</th>
+                  <th className="px-4 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
               <tbody className="divide-y divide-slate-100">
                 {highPriority.map((t) => (
-                  <tr key={t._id} className="cursor-pointer transition hover:bg-slate-50" onClick={() => onOpen(t._id)}>
-                    <td className="py-3 pr-4 font-medium text-blue-600">{t.ticketId}</td>
-                    <td className="max-w-xs truncate py-3 pr-4 text-slate-600">{t.subject}</td>
-                    <td className="py-3 pr-4"><span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${priorityCls(t.priority)}`}>{t.priority}</span></td>
-                    <td className="py-3 pr-4"><StatusBadge status={t.status} /></td>
+                  <tr key={t._id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onOpen(t._id)}>
+                    <td className="px-4 py-3 font-medium text-blue-600 hover:underline">{t.ticketId}</td>
+                    <td className="max-w-xs truncate px-4 py-3 font-medium text-slate-800" title={t.subject}>{t.subject}</td>
+                    <td className="px-4 py-3 text-slate-600">{t.category?.name || '—'}</td>
+                    <td className="px-4 py-3"><span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${priorityCls(t.priority)}`}>{t.priority}</span></td>
+                    <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{formatDate(t.createdAt)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onOpen(t._id)
+                          }}
+                          className="inline-flex items-center gap-1.5 shadow-2xs hover:border-blue-400 hover:text-blue-600"
+                          title="View and inspect all associated ticket details"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">visibility</span>
+                          <span>View</span>
+                        </Button>
+                        {canReopen && (t.status === 'Closed' || t.status === 'Resolved') && (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onOpen(t._id)
+                            }}
+                            className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                            title="Reopen ticket for follow-up"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                            <span>Reopen</span>
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -153,17 +210,115 @@ function DashboardTab({ kpis, tickets, loading, onOpen }) {
   )
 }
 
-function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, setSearch, setStatus, setPriority, reset, onPage, onPageSize }) {
+function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, setSearch, setStatus, setPriority, reset, onPage, onPageSize, canReopen }) {
+  const hasActiveFilters = Boolean(filters.search?.trim() || filters.status || filters.priority)
+
+  const statusOptions = [
+    { value: '', label: 'All Statuses' },
+    ...STATUSES.map((s) => ({ value: s, label: s })),
+  ]
+
+  const priorityOptions = [
+    { value: '', label: 'All Priorities' },
+    ...PRIORITIES.map((p) => ({ value: p, label: p })),
+  ]
+
   return (
-    <div className="space-y-4">
-      <Card className="flex flex-wrap items-end gap-4 p-4">
-        <div className="w-64"><Input label="Search" placeholder="Ticket ID or subject…" value={filters.search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <div className="w-44"><Select label="Status" value={filters.status} onChange={(e) => setStatus(e.target.value)}><option value="">All Statuses</option>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
-        <div className="w-40"><Select label="Priority" value={filters.priority} onChange={(e) => setPriority(e.target.value)}><option value="">All Priorities</option>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</Select></div>
-        <Button variant="secondary" onClick={reset}>Reset</Button>
+    <div className="space-y-5">
+      {/* Redesigned Filter Panel with modern styling, clean alignment, and crisp borders */}
+      <Card className="overflow-hidden border border-slate-200 bg-white p-5 shadow-xs">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[20px] text-blue-600">tune</span>
+            <span className="text-sm font-semibold text-slate-800">Filter & Search Tickets</span>
+            {hasActiveFilters && (
+              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                Filters Active
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span>Showing <strong className="text-slate-800">{tickets.length}</strong> {meta?.total ? `of ${meta.total}` : ''} tickets</span>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={reset}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 transition duration-150 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">filter_alt_off</span>
+                Clear Filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter dropdowns and inputs with perfect alignment, clean borders, and proper padding */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
+          <div>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Search Ticket
+              </span>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                  <span className="material-symbols-outlined text-[18px]">search</span>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Ticket ID or subject…"
+                  value={filters.search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-800 shadow-xs outline-none transition-all duration-200 hover:border-blue-400 hover:bg-slate-50/70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-500/15"
+                />
+                {filters.search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600"
+                    title="Clear search"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                )}
+              </div>
+            </label>
+          </div>
+
+          <div>
+            <DropdownSelect
+              label="Ticket Status"
+              value={filters.status}
+              onChange={(e) => setStatus(e.target.value)}
+              options={statusOptions}
+              placeholder="All Statuses"
+            />
+          </div>
+
+          <div>
+            <DropdownSelect
+              label="Priority Level"
+              value={filters.priority}
+              onChange={(e) => setPriority(e.target.value)}
+              options={priorityOptions}
+              placeholder="All Priorities"
+            />
+          </div>
+
+          <div>
+            <Button
+              variant="secondary"
+              onClick={reset}
+              className="w-full h-[42px] justify-center rounded-xl border-slate-300 hover:border-blue-400 hover:bg-slate-50 transition-all shadow-xs"
+              disabled={!hasActiveFilters}
+            >
+              <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+              Reset Filters
+            </Button>
+          </div>
+        </div>
       </Card>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border border-slate-200 shadow-xs">
         {loading ? <Loader /> : error ? <ErrorState message={error} onRetry={refetch} /> : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -178,15 +333,46 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
                 {tickets.length === 0 ? (
                   <tr><td colSpan={8} className="py-10 text-center text-sm text-slate-400">No tickets match your filters.</td></tr>
                 ) : tickets.map((t) => (
-                  <tr key={t._id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{t.ticketId}</td>
-                    <td className="max-w-xs truncate px-4 py-3 text-slate-700">{t.subject}</td>
+                  <tr key={t._id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onOpen(t._id)}>
+                    <td className="px-4 py-3 font-medium text-blue-600 hover:underline">{t.ticketId}</td>
+                    <td className="max-w-xs truncate px-4 py-3 font-medium text-slate-800" title={t.subject}>{t.subject}</td>
                     <td className="px-4 py-3 text-slate-600">{t.category?.name || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{t.assignedTo?.name || 'Unassigned'}</td>
                     <td className="px-4 py-3"><span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${priorityCls(t.priority)}`}>{t.priority}</span></td>
                     <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                     <td className="px-4 py-3 text-xs text-slate-500">{formatDate(t.createdAt)}</td>
-                    <td className="px-4 py-3 text-right"><Button size="sm" variant="secondary" onClick={() => onOpen(t._id)}>View</Button></td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onOpen(t._id)
+                          }}
+                          className="inline-flex items-center gap-1.5 shadow-2xs hover:border-blue-400 hover:text-blue-600"
+                          title="View and inspect all associated ticket details"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">visibility</span>
+                          <span>View</span>
+                        </Button>
+                        {canReopen && (t.status === 'Closed' || t.status === 'Resolved') && (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onOpen(t._id)
+                            }}
+                            className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                            title="Reopen ticket for follow-up"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                            <span>Reopen</span>
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

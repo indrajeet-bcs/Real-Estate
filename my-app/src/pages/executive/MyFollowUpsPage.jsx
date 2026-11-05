@@ -124,7 +124,15 @@ export default function MyFollowUpsPage() {
     return sorted
   }, [rows, status, type, stage, project, dateRange, search, sort]) // eslint-disable-line
 
-  function call(r) { window.location.href = `tel:${(r.customer?.mobile || '').replace(/\s/g, '')}` }
+  function call(r) {
+    const rawNumber = String(r?.customer?.mobile || r?.mobile || '').trim()
+    const cleanNumber = rawNumber.replace(/[^\d+]/g, '')
+    if (!cleanNumber) {
+      toast.error('No phone number available for this contact.')
+      return
+    }
+    window.location.href = `tel:${cleanNumber}`
+  }
 
   const columns = [
     { key: 'name', header: 'Name', render: (r) => (
