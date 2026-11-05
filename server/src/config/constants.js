@@ -229,4 +229,5 @@ export const MODULES = {
   REGISTRATION: 'registration', // Registration module: sale-deed registration tracking
   POSSESSION: 'possession', // Possession module: handover tracking
   ROLE: 'role', // Custom-role engine: role definitions + permission builder
+  TASK: 'task', // Task Management module: assign & track executive tasks
 }

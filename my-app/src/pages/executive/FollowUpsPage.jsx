@@ -239,7 +239,7 @@ export default function FollowUpsPage() {
           <div className="mb-4 text-5xl">📋</div>
           <h3 className="text-lg font-semibold text-slate-800">No follow-ups scheduled</h3>
           <p className="mt-1 max-w-xs text-sm text-slate-500">
-            No follow-ups match the current filters. Adjust filters or create a new task.
+            No follow-ups match the current filters. Adjust filters or schedule a new follow-up.
           </p>
           <Button className="mt-6" onClick={() => setShowCreate(true)}>+ Create Follow-up</Button>
         </div>
@@ -581,7 +581,7 @@ function MissModal({ item, onClose, onDone }) {
     >
       <div className="space-y-4">
         <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          This will escalate a notification to your team manager and log the missed task on the customer timeline.
+          This will escalate a notification to your team manager and log the missed follow-up on the customer timeline.
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Reason <span className="text-rose-500">*</span></label>

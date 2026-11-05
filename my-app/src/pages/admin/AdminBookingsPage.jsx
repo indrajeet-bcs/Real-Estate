@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { formatDate } from '../../lib/format.js'
 import {
-  PageHeader, StatCard, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState,
+  PageHeader, StatCard, Button, Input, Select, Textarea, Table, StatusBadge, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
 
 const inr = (n) => {
@@ -39,6 +39,7 @@ export default function AdminBookingsPage({
   const navigate = useNavigate()
   const [register, setRegister] = useState(false)
   const [transferFor, setTransferFor] = useState(null)
+  const [rejectModalFor, setRejectModalFor] = useState(null)
   const [showAdv, setShowAdv] = useState(false)
   const [search, setSearch] = useState('')
   const [status, setStatusFilter] = useState('all')
@@ -131,7 +132,7 @@ export default function AdminBookingsPage({
         {can('booking', 'edit') && r.status === 'reserved' && (
           <>
             <Button size="sm" variant="success" onClick={(e) => setStatus(e, r, 'confirmed')}>Confirm</Button>
-            <Button size="sm" variant="danger" onClick={(e) => setStatus(e, r, 'cancelled')}>Cancel</Button>
+            <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); setRejectModalFor(r) }}>Reject</Button>
           </>
         )}
       </div>
@@ -237,6 +238,7 @@ export default function AdminBookingsPage({
       {register && <RegisterModal onClose={() => setRegister(false)} onDone={() => { setRegister(false); refetch() }} />}
       {transferFor && <TransferBookingModal booking={transferFor} execs={execs || []} onClose={() => setTransferFor(null)} onDone={() => { setTransferFor(null); refetch() }} />}
       {decideReq && <DecideRequestModal item={decideReq} onClose={() => setDecideReq(null)} onDone={() => { setDecideReq(null); refetch() }} />}
+      {rejectModalFor && <RejectBookingModal booking={rejectModalFor} onClose={() => setRejectModalFor(null)} onDone={() => { setRejectModalFor(null); refetch() }} />}
     </div>
   )
 }
@@ -245,14 +247,20 @@ export default function AdminBookingsPage({
 function DecideRequestModal({ item, onClose, onDone }) {
   const toast = useToast()
   const [note, setNote] = useState('')
+  const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { kind, booking, req } = item
 
   async function decide(decision) {
+    if (decision === 'reject' && !note.trim()) {
+      setError('A mandatory reason or remark is required before rejecting this request.')
+      return
+    }
+    setError('')
     setBusy(true)
     try {
-      if (kind === 'discount') await bookingsApi.decideDiscount(booking._id, { decision, note })
-      else await bookingsApi.decideCancellation(booking._id, { decision, note })
+      if (kind === 'discount') await bookingsApi.decideDiscount(booking._id, { decision, note: note.trim() })
+      else await bookingsApi.decideCancellation(booking._id, { decision, note: note.trim() })
       toast.success(decision === 'approve' ? 'Request approved' : 'Request rejected')
       onDone()
     } catch (err) {
@@ -290,8 +298,159 @@ function DecideRequestModal({ item, onClose, onDone }) {
             </>
           )}
         </div>
-        <Input label="Decision note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Decision Note / Remark {note.trim() ? '' : <span className="text-xs text-rose-500 font-normal">* (mandatory if rejecting)</span>}
+          </label>
+          <Textarea
+            rows={3}
+            placeholder="Enter reason or remark (mandatory when rejecting)..."
+            value={note}
+            onChange={(e) => { setNote(e.target.value); if (error) setError('') }}
+            className={error ? 'border-red-400 focus:border-red-500' : ''}
+          />
+          {error && <p className="mt-1 text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
       </div>
+    </Modal>
+  )
+}
+
+// Mandatory rejection popup for reservations / bookings (Sub-Admin / Admin)
+export function RejectBookingModal({ booking, onClose, onDone }) {
+  const toast = useToast()
+  const [reason, setReason] = useState('')
+  const [category, setCategory] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const REASONS = [
+    'Customer cancelled / changed mind',
+    'Token/Payment not received within holding period',
+    'Loan or financing rejected',
+    'Unit transfer / change requested',
+    'Pricing / commercial dispute',
+    'Duplicate or incorrect reservation entry',
+    'Other (specified in remarks)',
+  ]
+
+  async function handleSubmit(e) {
+    e?.preventDefault()
+    const trimmed = reason.trim()
+    if (!category && !trimmed) {
+      setError('A reason or remark is mandatory to reject this reservation.')
+      return
+    }
+    const finalReason = [category, trimmed].filter(Boolean).join(' — ')
+    if (!finalReason.trim()) {
+      setError('A reason or remark is mandatory to reject this reservation.')
+      return
+    }
+    setError('')
+    setBusy(true)
+    try {
+      await bookingsApi.setStatus(booking._id, {
+        status: 'cancelled',
+        cancelReason: finalReason,
+      })
+      toast.success('Reservation rejected & booking cancelled successfully')
+      onDone()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reject reservation')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Reject Reservation — #${booking._id?.slice(-8).toUpperCase()}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
+            Dismiss
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleSubmit}
+            disabled={busy}
+          >
+            {busy ? 'Rejecting…' : 'Confirm Rejection'}
+          </Button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 text-sm">
+        <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3.5 text-xs text-rose-900">
+          <div className="font-semibold text-rose-900 mb-1 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base text-rose-600">warning</span>
+            Mandatory Rejection Reason
+          </div>
+          <p>
+            Rejecting this reservation will cancel the booking and release unit{' '}
+            <strong className="font-semibold">{booking.unit?.unitNumber || 'selected unit'}</strong> back to Available inventory. Please provide the reason below.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs">
+          <div>
+            <span className="text-slate-500">Buyer:</span>{' '}
+            <strong className="text-slate-800">{booking.customer?.name || '—'}</strong>
+          </div>
+          <div>
+            <span className="text-slate-500">Project:</span>{' '}
+            <strong className="text-slate-800">{booking.project?.name || '—'}</strong>
+          </div>
+          <div>
+            <span className="text-slate-500">Unit:</span>{' '}
+            <strong className="text-slate-800">{booking.unit?.unitNumber || '—'}</strong>
+          </div>
+          <div>
+            <span className="text-slate-500">Sale Value:</span>{' '}
+            <strong className="text-slate-800">{booking.totalValue ? inr(booking.totalValue) : '—'}</strong>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block font-medium text-slate-700">
+            Rejection Reason Category <span className="text-rose-500">*</span>
+          </label>
+          <select
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value)
+              if (error) setError('')
+            }}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500"
+          >
+            <option value="">-- Select a reason --</option>
+            {REASONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block font-medium text-slate-700">
+            Remarks / Rejection Notes <span className="text-rose-500">*</span>
+          </label>
+          <Textarea
+            rows={3}
+            placeholder="Type mandatory remark explaining why this reservation is rejected..."
+            value={reason}
+            onChange={(e) => {
+              setReason(e.target.value)
+              if (error) setError('')
+            }}
+            className={error ? 'border-red-400 focus:border-red-500' : ''}
+          />
+          {error && <p className="mt-1 text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
+      </form>
     </Modal>
   )
 }

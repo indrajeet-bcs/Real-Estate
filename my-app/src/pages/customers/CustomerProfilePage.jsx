@@ -26,6 +26,35 @@ export default function CustomerProfilePage() {
   const initialTab = TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'Overview'
   const [tab, setTab] = useState(initialTab)
   const [transferring, setTransferring] = useState(false)
+  const toast = useToast()
+
+  const handleCall = () => {
+    const rawNumber = String(customer?.mobile || '').trim()
+    const cleanNumber = rawNumber.replace(/[^\d+]/g, '')
+    if (!cleanNumber) {
+      toast.error('No valid phone number available for this contact.')
+      return
+    }
+
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(cleanNumber).catch(() => {})
+    }
+
+    try {
+      const a = document.createElement('a')
+      a.href = `tel:${cleanNumber}`
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => {
+        try { document.body.removeChild(a) } catch (_) {}
+      }, 100)
+    } catch (_) {
+      window.location.href = `tel:${cleanNumber}`
+    }
+
+    toast.info(`Dialing ${cleanNumber} (${customer.name}). Number copied to clipboard!`)
+  }
 
   const { data, loading, error, refetch } = useFetch(
     useCallback(() => customersApi.get(id), [id])
@@ -38,9 +67,37 @@ export default function CustomerProfilePage() {
   const editable = can('customer', 'edit')
   const canTransfer = can('lead', 'assign') // Admin & Sub-Admin
 
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1)
+    } else {
+      const p = window.location.pathname
+      if (p.includes('/executive/leads')) navigate('/executive/leads')
+      else if (p.includes('/executive/customers')) navigate('/executive/customers')
+      else if (p.includes('/sub-admin/leads')) navigate('/sub-admin/leads')
+      else if (p.includes('/sub-admin/customers')) navigate('/sub-admin/customers')
+      else if (p.includes('/admin/leads')) navigate('/admin/leads')
+      else if (p.includes('/admin/buyers')) navigate('/admin/bookings')
+      else navigate(-1)
+    }
+  }
+
   return (
     <div>
-      <button onClick={() => navigate(-1)} className="mb-4 text-sm text-slate-600 hover:text-slate-900">← Back</button>
+      {/* Back Navigation Button */}
+      <div className="mb-5 flex items-center">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-blue-600 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-[0.98]"
+          title="Back to previous list"
+        >
+          <span className="material-symbols-outlined text-[19px] text-slate-400 transition-all duration-200 group-hover:-translate-x-1 group-hover:text-blue-600">
+            arrow_back
+          </span>
+          <span>Back</span>
+        </button>
+      </div>
 
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -49,14 +106,39 @@ export default function CustomerProfilePage() {
             <h1 className="text-2xl font-semibold text-slate-900">{customer.name}</h1>
             <StatusBadge status={customer.status} />
           </div>
-          <p className="mt-1 text-sm text-slate-600">
-            {customer.mobile} {customer.email && `· ${customer.email}`} · Source: {titleCase(customer.source)}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            {customer.mobile ? (
+              <button
+                type="button"
+                onClick={handleCall}
+                className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                title="Click to dial"
+              >
+                <span className="material-symbols-outlined text-[15px] text-emerald-600">call</span>
+                <span>{customer.mobile}</span>
+              </button>
+            ) : (
+              <span className="text-slate-400">No mobile</span>
+            )}
+            {customer.email && <span>· {customer.email}</span>}
+            <span>· Source: {titleCase(customer.source)}</span>
+          </div>
           {customer.assignedTo && (
-            <p className="text-xs text-slate-500">Assigned to {customer.assignedTo.name}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Assigned to {customer.assignedTo.name}</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {customer.mobile && (
+            <button
+              type="button"
+              onClick={handleCall}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-xs hover:bg-emerald-100 transition cursor-pointer"
+              title="Call this contact"
+            >
+              <span className="material-symbols-outlined text-[16px] text-emerald-600">call</span>
+              <span>Call</span>
+            </button>
+          )}
           {canTransfer && <Button variant="secondary" onClick={() => setTransferring(true)}>Transfer</Button>}
           {editable && <StatusActions customer={customer} onDone={refetch} />}
         </div>

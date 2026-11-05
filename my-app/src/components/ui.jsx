@@ -82,7 +82,7 @@ export function ExportMenu({ items = [], label = 'Export', disabled = false, loa
 
 // --- Inputs ---
 const fieldCls =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500'
+  'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 shadow-xs outline-none transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/50 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400'
 
 export function renderFieldLabel(label, required) {
   if (!label) return null
@@ -90,7 +90,7 @@ export function renderFieldLabel(label, required) {
   const cleanLabel = typeof label === 'string' ? label.replace(/\s*\*+\s*$/, '') : label
 
   return (
-    <span className="mb-1 block text-sm font-medium text-slate-700">
+    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
       {cleanLabel}
       {isReq && <span className="ml-1 font-bold text-red-500" title="Mandatory field">*</span>}
     </span>
@@ -154,14 +154,25 @@ export function Textarea({ label, required, className = '', ...props }) {
   )
 }
 
-export function Select({ label, children, required, className = '', ...props }) {
+export function Select({ label, children, required, className = '', containerClassName = '', ...props }) {
   const isRequired = required || props.required
   return (
-    <label className="block">
+    <label className={`block ${containerClassName}`}>
       {renderFieldLabel(label, isRequired)}
-      <select required={isRequired} className={`${fieldCls} ${className}`} {...props}>
-        {children}
-      </select>
+      <div className="relative">
+        <select
+          required={isRequired}
+          className={`w-full appearance-none rounded-xl border border-slate-200 bg-white pl-3.5 pr-9 py-2 text-sm text-slate-800 shadow-xs outline-none transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/50 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${className}`}
+          {...props}
+        >
+          {children}
+        </select>
+        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition-colors">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </span>
+      </div>
     </label>
   )
 }
@@ -275,24 +286,54 @@ const chevronR = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 export function Pagination({ meta, onPage, onPageSize, pageSizeOptions = [10, 20, 25, 50, 100], loading = false }) {
   const [jump, setJump] = useState('')
   const [invalid, setInvalid] = useState(false)
+  const [isCustomLimit, setIsCustomLimit] = useState(false)
+  const [customLimitInput, setCustomLimitInput] = useState('')
+
   if (!meta || (meta.total || 0) === 0) return null
 
-  const page = meta.page || 1
-  const pages = Math.max(1, meta.pages || 1)
-  const total = meta.total || 0
-  const limit = meta.limit || pageSizeOptions[0]
-  if (pages <= 1 && !onPageSize) return null // nothing to page and no size control
+  const page = Math.max(1, Number(meta.page) || 1)
+  const total = Number(meta.total) || 0
+  const limit = Math.max(1, Number(meta.limit) || pageSizeOptions[0] || 20)
+  const pages = Math.max(1, Number(meta.pages) || Math.ceil(total / limit) || 1)
 
-  const from = (page - 1) * limit + 1
+  const from = Math.min((page - 1) * limit + 1, total)
   const to = Math.min(page * limit, total)
   const fmt = (n) => n.toLocaleString('en-IN')
-  const sizeOpts = [...new Set([...pageSizeOptions, limit])].sort((a, b) => a - b)
-  const go = (p) => { if (!loading && p !== page) onPage(p) }
 
-  const goToJump = () => {
-    const n = Number(jump)
-    if (!jump || !Number.isInteger(n) || n < 1 || n > pages) { setInvalid(true); return }
-    setInvalid(false); setJump(''); go(n)
+  const baseOpts = [5, 10, 15, 20, 25, 50, 100, 200, 500]
+  const sizeOpts = [...new Set([...pageSizeOptions, ...baseOpts, limit])].sort((a, b) => a - b)
+
+  const go = (p) => {
+    if (!loading && typeof onPage === 'function') {
+      onPage(p)
+    }
+  }
+
+  const goToJump = (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault()
+    const raw = jump.trim()
+    let target = page
+    if (raw) {
+      const n = parseInt(raw, 10)
+      if (isNaN(n) || n < 1) {
+        setInvalid(true)
+        return
+      }
+      // Gracefully clamp to [1, pages] so any customizable number navigates safely
+      target = Math.max(1, Math.min(n, pages))
+    }
+    setInvalid(false)
+    setJump('')
+    go(target)
+  }
+
+  const handleCustomLimitSubmit = (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault()
+    const n = parseInt(customLimitInput, 10)
+    if (n && n > 0 && typeof onPageSize === 'function') {
+      onPageSize(n)
+      setIsCustomLimit(false)
+    }
   }
 
   return (
@@ -330,26 +371,84 @@ export function Pagination({ meta, onPage, onPageSize, pageSizeOptions = [10, 20
       {/* RIGHT — rows per page · jump to page */}
       <div className="order-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 md:order-3 md:justify-end">
         {onPageSize && (
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
             <span className="whitespace-nowrap">Rows per page</span>
-            <select value={limit} disabled={loading} onChange={(e) => onPageSize(Number(e.target.value))}
-              className={`${pgCtl} cursor-pointer pl-3 pr-8 hover:bg-slate-50`}>
-              {sizeOpts.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-        )}
-        {pages > 1 && (
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-slate-500 lg:inline">Go to</span>
-            <input value={jump} inputMode="numeric" disabled={loading} placeholder={String(page)}
-              aria-label={`Jump to page (1 to ${pages})`} aria-invalid={invalid}
-              title={invalid ? `Enter a page between 1 and ${pages}` : `Jump to a page (1–${pages})`}
-              onChange={(e) => { setJump(e.target.value.replace(/[^0-9]/g, '')); if (invalid) setInvalid(false) }}
-              onKeyDown={(e) => { if (e.key === 'Enter') goToJump() }}
-              className={`h-11 w-16 rounded-lg border px-2 text-center text-sm shadow-sm outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-offset-1 ${invalid ? 'border-red-400 text-red-600 focus-visible:ring-red-400' : 'border-slate-300 text-slate-700 focus-visible:ring-blue-500'}`} />
-            <button type="button" onClick={goToJump} disabled={loading} className={`${pgBtn} px-4`}>Go</button>
+            {!isCustomLimit ? (
+              <select
+                value={sizeOpts.includes(limit) ? limit : 'custom'}
+                disabled={loading}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    setIsCustomLimit(true)
+                    setCustomLimitInput(String(limit))
+                  } else {
+                    onPageSize(Number(e.target.value))
+                  }
+                }}
+                className={`${pgCtl} cursor-pointer pl-3 pr-8 hover:bg-slate-50`}
+              >
+                {sizeOpts.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+                <option value="custom">Custom…</option>
+              </select>
+            ) : (
+              <form onSubmit={handleCustomLimitSubmit} className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={customLimitInput}
+                  onChange={(e) => setCustomLimitInput(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="e.g. 30"
+                  autoFocus
+                  className="h-11 w-20 rounded-lg border border-blue-500 px-2 text-center text-sm shadow-sm outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={loading || !customLimitInput || parseInt(customLimitInput, 10) < 1}
+                  className={`${pgBtn} px-3 text-xs`}
+                >
+                  Set
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomLimit(false)}
+                  className="text-xs text-slate-400 hover:text-slate-600 px-1"
+                  title="Cancel custom rows"
+                >
+                  ✕
+                </button>
+              </form>
+            )}
           </div>
         )}
+
+        {/* Go to page control - always available when there are records */}
+        <form onSubmit={goToJump} className="flex items-center gap-2">
+          <span className="text-sm text-slate-500">Go to</span>
+          <input
+            value={jump}
+            inputMode="numeric"
+            disabled={loading}
+            placeholder={String(page)}
+            aria-label={`Jump to page (1 to ${pages})`}
+            aria-invalid={invalid}
+            title={invalid ? `Enter a valid page number (1 to ${pages})` : `Jump to a page (1–${pages})`}
+            onChange={(e) => {
+              setJump(e.target.value.replace(/[^0-9]/g, ''))
+              if (invalid) setInvalid(false)
+            }}
+            className={`h-11 w-16 rounded-lg border px-2 text-center text-sm shadow-sm outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-offset-1 ${
+              invalid ? 'border-red-400 text-red-600 focus-visible:ring-red-400' : 'border-slate-300 text-slate-700 focus-visible:ring-blue-500'
+            }`}
+          />
+          <button type="submit" disabled={loading} className={`${pgBtn} px-4 font-semibold text-blue-600 hover:text-blue-700`}>
+            Go
+          </button>
+        </form>
       </div>
     </div>
   )

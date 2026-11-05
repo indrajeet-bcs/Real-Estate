@@ -29,9 +29,15 @@ export const ROLE_PERMISSIONS = {
     [MODULES.BUILDER]: ['view', 'create', 'edit', 'delete'],
     [MODULES.PROJECT]: ['view', 'create', 'edit', 'delete'],
     [MODULES.UNIT]: ['view', 'create', 'edit', 'delete'],
+ preeti
+    [MODULES.CUSTOMER]: ['view', 'create', 'edit', 'delete'], // Phase 4 ✅ (KYC, ownership, creation)
+    [MODULES.LEAD]: ['view', 'create', 'edit', 'delete', 'assign'], // Phase 4 ✅
+    [MODULES.FOLLOWUP]: ['view'],
+
     [MODULES.CUSTOMER]: ['view', 'create', 'edit', 'delete'], // Phase 4 ✅ (KYC, ownership)
     [MODULES.LEAD]: ['view', 'create', 'edit', 'assign', 'delete'], // Phase 4 ✅
     [MODULES.FOLLOWUP]: ['view', 'create', 'edit'],
+    main
     [MODULES.VISIT]: ['view', 'create', 'edit'],
     [MODULES.BOOKING]: ['view', 'create', 'edit'], // Phase 5 ✅
     [MODULES.COMMISSION]: ['view', 'create', 'edit', 'delete'], // Phase 6 ✅
@@ -47,6 +53,7 @@ export const ROLE_PERMISSIONS = {
     [MODULES.REGISTRATION]: ['view', 'create', 'edit', 'delete', 'export'], // Registration tracking
     [MODULES.POSSESSION]: ['view', 'create', 'edit', 'delete', 'export'], // Possession tracking
     [MODULES.ROLE]: ['view', 'create', 'edit', 'delete'], // Custom-role engine (Admin)
+    [MODULES.TASK]: ['view', 'create', 'edit', 'delete', 'assign'], // Task Management: assign & track executive tasks
   },
 
   [SUB_ADMIN]: {
@@ -54,8 +61,13 @@ export const ROLE_PERMISSIONS = {
     [MODULES.BUILDER]: ['view'],
     [MODULES.PROJECT]: ['view'],
     [MODULES.UNIT]: ['view', 'edit'], // Branch-admin port: hold/release units
+ preeti
+    [MODULES.LEAD]: ['view', 'create', 'edit', 'delete', 'assign', 'import'],
+    [MODULES.CUSTOMER]: ['view', 'create', 'edit', 'delete'], // manage customer info + change owner (spec)
+
     [MODULES.LEAD]: ['view', 'create', 'edit', 'assign', 'import'],
     [MODULES.CUSTOMER]: ['view', 'create', 'edit'], // manage customer info + change owner (spec)
+ main
     [MODULES.FOLLOWUP]: ['view', 'create', 'edit'], // manage/assign branch follow-ups (spec)
     [MODULES.VISIT]: ['view', 'create', 'edit'], // schedule, oversight, flag missed
     [MODULES.BOOKING]: ['view', 'edit'], // Branch-admin port: verify/confirm bookings
@@ -73,6 +85,7 @@ export const ROLE_PERMISSIONS = {
     // (+ delete for Finance). Remove 'delete' per-user for a pure Branch Admin.
     // 'verify' gates expense verification; 'edit' also gates category management.
     [MODULES.EXPENSE]: ['view', 'create', 'edit', 'export', 'verify', 'delete'],
+    [MODULES.TASK]: ['view', 'create', 'edit', 'delete', 'assign'], // Task Management: assign & track executive tasks
     // Legal: Legal team + Branch Admin / Team Leader. 'assign' = assign legal
     // executive; 'verify' = verify documents. Pure Branch Admin can have
     // verify/delete removed per-user (they mainly assign + monitor).
@@ -86,7 +99,11 @@ export const ROLE_PERMISSIONS = {
     [MODULES.BUILDER]: ['view'],
     [MODULES.PROJECT]: ['view'],
     [MODULES.UNIT]: ['view'],
+ preeti
+    [MODULES.CUSTOMER]: ['view', 'create', 'edit'], // assigned customers + create new customer
+
     [MODULES.CUSTOMER]: ['view', 'create', 'edit'], // assigned customers only (scoped in query)
+ main
     [MODULES.LEAD]: ['view', 'create', 'edit'],
     [MODULES.FOLLOWUP]: ['view', 'create', 'edit'],
     [MODULES.VISIT]: ['view', 'create', 'edit'],
@@ -112,6 +129,7 @@ export const ROLE_PERMISSIONS = {
     [MODULES.LOAN]: ['view', 'create', 'edit'],
     [MODULES.REGISTRATION]: ['view', 'create', 'edit'],
     [MODULES.POSSESSION]: ['view', 'create', 'edit'],
+    [MODULES.TASK]: ['view', 'create', 'edit'], // Task Management: view assigned tasks & update status
   },
 }
 
@@ -136,6 +154,13 @@ export function effectivePermissions(user) {
     for (const [mod, actions] of user.permissions.entries()) result[mod] = actions
   }
 
+ preeti
+  // Core operational modules: Sub-Admin, Admin, and Sales Executive must always be able to schedule visits & create customers/leads
+  if ([ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE].includes(user.role)) {
+    result[MODULES.VISIT] = Array.from(new Set([...(result[MODULES.VISIT] || ['view']), 'create', 'edit']))
+    result[MODULES.CUSTOMER] = Array.from(new Set([...(result[MODULES.CUSTOMER] || ['view']), 'create', 'edit']))
+    result[MODULES.LEAD] = Array.from(new Set([...(result[MODULES.LEAD] || ['view']), 'create', 'edit']))
+
   // Core operational modules: Sub-Admin, Admin, and Sales Executive must always be able to schedule/manage visits, leads, and customers
   if ([ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE].includes(user.role)) {
     if (!result[MODULES.VISIT] || !result[MODULES.VISIT].includes('create')) {
@@ -147,6 +172,7 @@ export function effectivePermissions(user) {
     if (!result[MODULES.CUSTOMER] || !result[MODULES.CUSTOMER].includes('create')) {
       result[MODULES.CUSTOMER] = Array.from(new Set([...(result[MODULES.CUSTOMER] || ['view']), 'create', 'edit']))
     }
+main
   }
 
   return result
@@ -156,9 +182,16 @@ export function can(user, module, action) {
   if (!user) return false
   if (user.role === ROLES.SUPER_ADMIN) return true
 
+preeti
+  // Sub-Admins, Admins, and Sales Executives can always view, create, and edit visits, customers, and leads
+  if ([ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE].includes(user.role)) {
+    if (module === MODULES.VISIT && ['view', 'create', 'edit'].includes(action)) return true
+    if ((module === MODULES.CUSTOMER || module === MODULES.LEAD) && ['view', 'create', 'edit'].includes(action)) return true
+
   // Sub-Admins, Admins, and Sales Executives can always view, create, and edit visits, leads, and customers
   if ([ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE].includes(user.role) && [MODULES.VISIT, MODULES.LEAD, MODULES.CUSTOMER].includes(module)) {
     if (['view', 'create', 'edit'].includes(action)) return true
+ main
   }
 
   const perms = effectivePermissions(user)
