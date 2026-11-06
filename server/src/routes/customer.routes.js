@@ -1,15 +1,9 @@
 import { Router } from 'express'
 import * as ctrl from '../controllers/customer.controller.js'
 import { authenticate } from '../middleware/auth.js'
-import { requirePermission } from '../middleware/rbac.js'
-import { requireRole } from '../middleware/rbac.js'
- preeti
+import { requirePermission, requireRole } from '../middleware/rbac.js'
 import { ApiError } from '../utils/ApiError.js'
 import { can } from '../config/permissions.js'
-
-import { can } from '../config/permissions.js'
-import { ApiError } from '../utils/ApiError.js'
-main
 import { validate } from '../middleware/validate.js'
 import { upload } from '../middleware/upload.js'
 import { MODULES, ROLES } from '../config/constants.js'
@@ -60,38 +54,6 @@ router.post(
   ctrl.importCustomers
 )
 
- preeti
-router.get('/', validate(listCustomersSchema, 'query'), requirePermission(MODULES.CUSTOMER, 'view'), ctrl.listCustomers)
-router.get('/:id', requirePermission(MODULES.CUSTOMER, 'view'), ctrl.getCustomer)
-router.post(
-  '/',
-  validate(createCustomerSchema),
-  (req, res, next) => {
-    if (can(req.user, MODULES.CUSTOMER, 'create') || can(req.user, MODULES.LEAD, 'create')) {
-      return next()
-    }
-    return next(ApiError.forbidden('Not permitted to create customer'))
-  },
-  ctrl.createCustomer
-)
-const requireCustomerOrLeadEdit = (req, res, next) => {
-  if (can(req.user, MODULES.CUSTOMER, 'edit') || can(req.user, MODULES.LEAD, 'edit')) {
-    return next()
-  }
-  return next(ApiError.forbidden('Not permitted to edit customer or lead'))
-}
-
-<<<<<<< HEAD
-router.patch('/:id', validate(updateCustomerSchema), requireCustomerOrLeadEdit, ctrl.updateCustomer)
-router.post('/:id/notes', validate(addNoteSchema), requireCustomerOrLeadEdit, ctrl.addNote)
-router.post('/:id/interests', validate(interestSchema), requireCustomerOrLeadEdit, ctrl.addInterest)
-router.delete('/:id/interests/:interestId', requireCustomerOrLeadEdit, ctrl.removeInterest)
-router.post('/:id/documents', requireCustomerOrLeadEdit, upload.single('file'), ctrl.addDocument)
-router.patch('/:id/status', validate(changeStatusSchema), requireCustomerOrLeadEdit, ctrl.changeStatus)
-router.post('/:id/reopen', requireCustomerOrLeadEdit, ctrl.reopenCustomer)
-// Convert a qualified lead to a customer (Employee spec §Convert to Customer).
-router.post('/:id/convert', requireCustomerOrLeadEdit, ctrl.convertLead)
-=======
 // Guarantees that Sales Executive, Sub-Admin, and Admin always have full access
 // to create, view, and edit leads/customers without RBAC 403 blocks.
 function requireLeadOrCustomerPermission(action) {
@@ -106,7 +68,6 @@ function requireLeadOrCustomerPermission(action) {
     return requirePermission(MODULES.LEAD, action)(req, res, next)
   }
 }
- main
 
 router.get('/', validate(listCustomersSchema, 'query'), requireLeadOrCustomerPermission('view'), ctrl.listCustomers)
 router.get('/:id', requireLeadOrCustomerPermission('view'), ctrl.getCustomer)
@@ -121,6 +82,5 @@ router.patch('/:id/status', validate(changeStatusSchema), requireLeadOrCustomerP
 router.post('/:id/reopen', requireLeadOrCustomerPermission('edit'), ctrl.reopenCustomer)
 // Convert a qualified lead to a customer (Employee spec §Convert to Customer).
 router.post('/:id/convert', requireLeadOrCustomerPermission('edit'), ctrl.convertLead)
->>>>>>> 29c44943f8ef916e8d5fecd85ed39ea501c3fbf5
 
 export default router

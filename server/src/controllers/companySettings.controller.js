@@ -1,6 +1,7 @@
 import CompanySettings from '../models/CompanySettings.js'
 import MasterDataItem from '../models/MasterDataItem.js'
 import User from '../models/User.js'
+import Firm from '../models/Firm.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ok, created } from '../utils/apiResponse.js'
@@ -36,7 +37,19 @@ export const getNotifications = makeGet('notifications')
 export const updateNotifications = makeUpdate('notifications')
 export const getSecurity = makeGet('security')
 export const updateSecurity = makeUpdate('security')
-export const getBranding = makeGet('branding')
+export const getBranding = asyncHandler(async (req, res) => {
+  if (!req.user?.firm) {
+    return ok(res, {}, 'branding fetched')
+  }
+  const doc = await getDoc(req.user.firm)
+  const branding = { ...(doc.branding || {}) }
+  if (!branding.logo || !branding.companyName) {
+    const firm = await Firm.findById(req.user.firm).select('name logo').lean()
+    if (!branding.logo && firm?.logo) branding.logo = firm.logo
+    if (!branding.companyName && firm?.name) branding.companyName = firm.name
+  }
+  return ok(res, branding, 'branding fetched')
+})
 export const updateBranding = makeUpdate('branding')
 
 // Branding asset uploads (logo / favicon) — stores the served path onto branding.

@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { NAV_BY_ROLE } from '../../lib/navConfig.js'
 import { ROLE_LABELS, ROLES } from '../../lib/constants.js'
-import { actionCenterApi, branchSettingsApi } from '../../api/resources.js'
+import { actionCenterApi, branchSettingsApi, companyBrandingApi } from '../../api/resources.js'
 import NotificationBell from './NotificationBell.jsx'
 
 // Shared shell for all authenticated role dashboards: sidebar nav (role-gated)
@@ -20,6 +20,45 @@ export default function DashboardLayout() {
   const [actionCount, setActionCount] = useState(0)
   const [geofenceRadius, setGeofenceRadius] = useState(200)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [branding, setBranding] = useState(() => {
+    try {
+      const cached = localStorage.getItem('crm_branding')
+      return cached ? JSON.parse(cached) : null
+    } catch {
+      return null
+    }
+  })
+  const [logoError, setLogoError] = useState(false)
+
+  // Fetch company branding for logo and brand name
+  useEffect(() => {
+    let active = true
+    companyBrandingApi.get()
+      .then((res) => {
+        if (active && res.data?.data) {
+          setBranding(res.data.data)
+          try {
+            localStorage.setItem('crm_branding', JSON.stringify(res.data.data))
+          } catch {}
+        }
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [user.firm])
+
+  const getAssetUrl = (url) => {
+    if (!url) return null
+    if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url
+    const base = import.meta.env.VITE_API_URL
+    if (base && base.startsWith('http')) {
+      const origin = new URL(base).origin
+      return `${origin}${url.startsWith('/') ? '' : '/'}${url}`
+    }
+    return url
+  }
+
+  const brandLogo = branding?.logo || (typeof user.firm === 'object' ? user.firm?.logo : null)
+  const brandName = branding?.companyName || (typeof user.firm === 'object' ? user.firm?.name : null) || user.company || 'Real Estate CRM'
 
   // Mobile drawer open state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -116,12 +155,28 @@ export default function DashboardLayout() {
         aria-label="Sidebar navigation"
       >
         <div className="flex h-full w-64 shrink-0 flex-col">
-          <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white shadow-sm">
-                RE
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-4">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {brandLogo && !logoError ? (
+                <img
+                  src={getAssetUrl(brandLogo)}
+                  alt={brandName}
+                  onError={() => setLogoError(true)}
+                  className="h-8 max-h-8 max-w-[120px] object-contain rounded"
+                />
+              ) : (
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white shadow-sm ring-1 ring-blue-700/20">
+                  <span className="material-symbols-outlined text-[20px]">apartment</span>
+                </div>
+              )}
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-slate-900 tracking-tight leading-tight text-sm truncate max-w-[125px]">
+                  {brandName}
+                </span>
+                <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">
+                  {ROLE_LABELS[user.role]}
+                </span>
               </div>
-              <span className="font-semibold text-slate-900 tracking-tight">CRM</span>
             </div>
             <button
               type="button"
@@ -255,11 +310,11 @@ export default function DashboardLayout() {
       {/* Main */}
       <div className="flex flex-1 flex-col min-w-0 h-screen overflow-hidden">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 z-20 shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               type="button"
               onClick={toggleSidebar}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:bg-slate-200"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:bg-slate-200"
               title={desktopSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
               aria-label={desktopSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
             >
@@ -267,9 +322,36 @@ export default function DashboardLayout() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h2 className="text-sm font-medium text-slate-600">
-              {ROLE_LABELS[user.role]} Workspace
-            </h2>
+
+            {/* Application Branding & Logo */}
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              {brandLogo && !logoError ? (
+                <img
+                  src={getAssetUrl(brandLogo)}
+                  alt={brandName}
+                  onError={() => setLogoError(true)}
+                  className="h-8 max-h-8 max-w-[130px] sm:max-w-[170px] object-contain rounded-md"
+                />
+              ) : (
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white shadow-sm ring-1 ring-blue-700/20">
+                  <span className="material-symbols-outlined text-[20px]">apartment</span>
+                </div>
+              )}
+
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 text-sm tracking-tight truncate max-w-[140px] sm:max-w-[240px]">
+                    {brandName}
+                  </span>
+                  <span className="hidden sm:inline-block rounded-md bg-blue-50 border border-blue-200/80 px-2 py-0.5 text-[10px] font-semibold text-blue-700 uppercase tracking-wider">
+                    {ROLE_LABELS[user.role]}
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium truncate sm:hidden">
+                  {ROLE_LABELS[user.role]} Workspace
+                </span>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <NotificationBell />

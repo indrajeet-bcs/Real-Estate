@@ -710,20 +710,14 @@ export function Modal({ open, onClose, title, children, footer, wide = false }) 
   useBodyScrollLock(open)
   if (!open) return null
   return (
-<<<<<<< HEAD
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 pt-20 overscroll-contain backdrop-blur-xs"
+      className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 sm:p-6 overscroll-contain backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget && typeof onClose === 'function') onClose()
       }}
     >
       <div
-        className={`w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-slate-200 bg-white shadow-2xl overscroll-contain`}
-=======
-    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 sm:p-6 backdrop-blur-sm">
-      <div
-        className={`flex max-h-[90vh] w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}
->>>>>>> 29c44943f8ef916e8d5fecd85ed39ea501c3fbf5
+        className={`flex max-h-[90vh] w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl overscroll-contain`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">

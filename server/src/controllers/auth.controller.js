@@ -59,7 +59,7 @@ async function issueTokens(res, user, set = {}) {
 // POST /api/auth/login
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body
-  const user = await User.findOne({ email }).select('+password +refreshTokens').populate('customRole')
+  const user = await User.findOne({ email }).select('+password +refreshTokens').populate('customRole').populate('firm', 'name logo')
   if (!user || !(await user.comparePassword(password))) {
     throw ApiError.unauthorized('Invalid email or password')
   }
@@ -93,7 +93,7 @@ export const refresh = asyncHandler(async (req, res) => {
     throw ApiError.unauthorized('Invalid refresh token')
   }
 
-  const user = await User.findById(payload.sub).select('+refreshTokens').populate('customRole')
+  const user = await User.findById(payload.sub).select('+refreshTokens').populate('customRole').populate('firm', 'name logo')
   if (!user || !user.isActive) throw ApiError.unauthorized('Session no longer valid')
 
   const tokenHash = hashToken(token)
@@ -132,7 +132,7 @@ export const logout = asyncHandler(async (req, res) => {
 
 // GET /api/auth/me
 export const me = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).populate('manager', 'name').populate('customRole')
+  const user = await User.findById(req.user._id).populate('manager', 'name').populate('customRole').populate('firm', 'name logo')
   const json = user.toJSON()
   json.managerName = user.manager?.name || null
   return ok(res, { user: json, permissions: effectivePermissions(user) })

@@ -1,16 +1,10 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-<<<<<<< HEAD
 import { PageHeader, Card, StatCard, Button, Input, Select, DropdownSelect, StatusBadge, Pagination, Loader, ErrorState } from '../../components/ui.jsx'
-import { useAuth } from '../../context/AuthContext.jsx'
-import { ROLES } from '../../lib/constants.js'
-import { ticketsApi } from '../../api/resources.js'
-=======
-import { PageHeader, Card, StatCard, Button, Input, Select, StatusBadge, Pagination, Loader, ErrorState } from '../../components/ui.jsx'
 import { ticketsApi, ticketCategoriesApi } from '../../api/resources.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
->>>>>>> 29c44943f8ef916e8d5fecd85ed39ea501c3fbf5
+import { ROLES } from '../../lib/constants.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import { formatDate } from '../../lib/format.js'
@@ -27,12 +21,8 @@ const priorityCls = (p) =>
 
 export default function CustomerSupportPage() {
   const { user } = useAuth()
-<<<<<<< HEAD
-  const canReopen = [ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SUPER_ADMIN].includes(user?.role)
-=======
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
-
->>>>>>> 29c44943f8ef916e8d5fecd85ed39ea501c3fbf5
+  const canReopen = [ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SUPER_ADMIN].includes(user?.role)
   const [searchParams, setSearchParams] = useSearchParams()
   const TABS = useMemo(() => {
     const list = [

@@ -27,13 +27,12 @@ export default function CreateTicketModal({ onClose, onDone }) {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-<<<<<<< HEAD
   const categoryOptions = [
     { value: '', label: cats.loading ? 'Loading categories…' : 'Select Category' },
     ...categories.map((c) => ({ value: c._id, label: c.name })),
   ]
   const priorityOptions = PRIORITIES.map((p) => ({ value: p, label: p }))
-=======
+
   const handleQuickAddCategory = async (e) => {
     e?.preventDefault()
     if (!newCatName.trim()) {
@@ -56,7 +55,6 @@ export default function CreateTicketModal({ onClose, onDone }) {
       setNewCatBusy(false)
     }
   }
->>>>>>> 29c44943f8ef916e8d5fecd85ed39ea501c3fbf5
 
   const handleSubmit = async (e) => {
     e.preventDefault()
