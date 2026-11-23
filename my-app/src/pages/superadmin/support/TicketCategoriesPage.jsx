@@ -51,13 +51,21 @@ export default function TicketCategoriesPage() {
     }
   }
 
-  const handleDelete = async (cat) => {
+  const [catToDelete, setCatToDelete] = useState(null)
+  const [deletingCat, setDeletingCat] = useState(false)
+
+  const handleConfirmDeleteCat = async () => {
+    if (!catToDelete) return
+    setDeletingCat(true)
     try {
-      await ticketCategoriesApi.remove(cat._id)
+      await ticketCategoriesApi.remove(catToDelete._id)
       toast.success('Category deleted')
+      setCatToDelete(null)
       refetch()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not delete category')
+    } finally {
+      setDeletingCat(false)
     }
   }
 
@@ -76,7 +84,7 @@ export default function TicketCategoriesPage() {
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="ghost" onClick={() => handleToggle(r)}>{r.isActive ? 'Deactivate' : 'Activate'}</Button>
           <Button size="sm" variant="secondary" onClick={() => openModal('edit', r)}>Edit</Button>
-          <Button size="sm" variant="danger" onClick={() => handleDelete(r)}>Delete</Button>
+          <Button size="sm" variant="danger" onClick={() => setCatToDelete(r)}>Delete</Button>
         </div>
       )
     }
@@ -115,6 +123,36 @@ export default function TicketCategoriesPage() {
             />
           </div>
         </Modal>
+      )}
+
+      {/* Delete category confirmation popup */}
+      {catToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">Confirm Delete Category</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Are you sure you want to delete category <span className="font-semibold text-slate-700">"{catToDelete.name}"</span>? Any tickets assigned to this category will become unassigned.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCatToDelete(null)}
+                disabled={deletingCat}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteCat}
+                disabled={deletingCat}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingCat ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

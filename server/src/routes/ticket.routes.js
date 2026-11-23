@@ -2,7 +2,7 @@ import { Router } from 'express'
 import {
   getCategories, createCategory, updateCategory, toggleCategory, deleteCategory,
   listMembers, createMember, updateMember, deactivateMember, toggleMemberStatus,
-  listTickets, getTicket, createTicket, updateTicket, changeTicketStatus, assignTicket, addInternalNote
+  listTickets, getTicket, createTicket, updateTicket, changeTicketStatus, assignTicket, addInternalNote, deleteTicket
 } from '../controllers/ticket.controller.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
@@ -14,6 +14,7 @@ router.use(authenticate)
 
 const superAdminOnly = requireRole(ROLES.SUPER_ADMIN)
 const adminOrSuperAdmin = requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN)
+const adminOrSubAdmin = requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SUB_ADMIN)
 
 // Categories — readable by any authenticated user (needed to file/classify a
 // ticket); managed by Admin (Company Owner) and Super Admin only.
@@ -40,5 +41,6 @@ router.patch('/:id', updateTicket)
 router.patch('/:id/status', changeTicketStatus)
 router.patch('/:id/assign', assignTicket)
 router.post('/:id/notes', addInternalNote)
+router.delete('/:id', adminOrSubAdmin, deleteTicket)
 
 export default router

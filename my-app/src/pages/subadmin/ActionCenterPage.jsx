@@ -29,6 +29,7 @@ const TABS = [
 
 export default function ActionCenterPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+ preeti
   const tabParam = searchParams.get('tab')
   const defaultTab = 'discounts'
   const activeTab = (tabParam && TABS.some((t) => t.key === tabParam)) ? tabParam : defaultTab
@@ -49,6 +50,28 @@ export default function ActionCenterPage() {
   }
 
   const discounts = useFetch(useCallback(() => bookingsApi.list({ pendingRequests: 'discount' }), []))
+
+  const activeTabParam = searchParams.get('tab')
+  const [tab, setTabState] = useState(activeTabParam || 'discounts')
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    if (activeTabParam && activeTabParam !== tab) {
+      setTabState(activeTabParam)
+    }
+  }, [activeTabParam, tab])
+
+  const setTab = (newTab) => {
+    setTabState(newTab)
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      p.set('tab', newTab)
+      return p
+    })
+  }
+
+  const discounts = useFetch(useCallback(() => bookingsApi.list({ pendingRequests: 'discount', limit: 100 }), []))
+ main
   const leaves = useFetch(useCallback(() => leavesApi.list({ status: 'pending' }), []))
   const bookings = useFetch(useCallback(() => bookingsApi.list({ status: 'reserved' }), []))
   const units = useFetch(useCallback(() => unitsApi.list({ status: 'locked' }), []))
@@ -64,6 +87,24 @@ export default function ActionCenterPage() {
     circulars: 0,
   }
 
+ preeti
+
+  const TABS = [
+    { key: 'discounts', label: 'Discounts' },
+    { key: 'bookings', label: 'Bookings' },
+    { key: 'leaves', label: 'Leaves' },
+    { key: 'lead_reassignments', label: 'Lead Reassignments' },
+    { key: 'staff_transfers', label: 'Staff Transfers' },
+    { key: 'inventory_holds', label: 'Inventory Holds' },
+    { key: 'circulars', label: 'Circulars' },
+  ]
+
+  const refreshAllBookings = () => {
+    discounts.refetch()
+    bookings.refetch()
+  }
+
+ main
   return (
     <div>
       <PageHeader title="Action Center" subtitle="Requests requiring your action, grouped by type." />
@@ -87,7 +128,11 @@ export default function ActionCenterPage() {
         <Input label="Search" placeholder="Employee, customer, project…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
+ preeti
       {tab === 'discounts' && <DiscountsTab q={discounts} search={search} />}
+
+      {tab === 'discounts' && <DiscountsTab q={discounts} onDecided={refreshAllBookings} search={search} />}
+main
       {tab === 'bookings' && <BookingsTab q={bookings} search={search} />}
       {tab === 'leaves' && <LeavesTab q={leaves} search={search} />}
       {tab === 'lead_reassignments' && <ReassignTab q={unassigned} search={search} />}
@@ -114,6 +159,7 @@ function EmptyTab({ title, note }) {
   )
 }
 
+ preeti
 function RejectDiscountModal({ booking, onClose, onDone }) {
   useBodyScrollLock(true)
   const [reason, setReason] = useState('')
@@ -176,10 +222,16 @@ function RejectDiscountModal({ booking, onClose, onDone }) {
 function DiscountsTab({ q, search }) {
   const toast = useToast()
   const [rejectingBooking, setRejectingBooking] = useState(null)
+
+// Discounts — approval flow: employee raises discount request, Admin/Sub-Admin approves or rejects.
+function DiscountsTab({ q, onDecided, search }) {
+  const toast = useToast()
+ main
   const rows = filterRows(q.data || [], search, (r) => [
     r.customer?.name,
     r.project?.name,
     r.unit?.unitNumber,
+ preeti
     r.bookedBy?.name,
     r.discountRequest?.remarks,
     r.discountRequest?.source,
@@ -193,11 +245,29 @@ function DiscountsTab({ q, search }) {
       await bookingsApi.decideDiscount(b._id, { decision: 'approve' })
       toast.success('Discount approved successfully')
       q.refetch()
+
+    r.discountRequest?.requestedByName,
+    r.bookedBy?.name,
+    r.discountRequest?.remarks,
+    r.discountRequest?.givenBy,
+  ])
+
+  const handleApprove = async (booking) => {
+    const dr = booking.discountRequest
+    const amountLabel = formatMoney(dr?.totalDiscount || 0)
+    if (!window.confirm(`Approve requested discount of ${amountLabel} for booking ${shortId(booking._id)}?`)) return
+    try {
+      await bookingsApi.decideDiscount(booking._id, { decision: 'approve' })
+      toast.success('Discount request approved')
+      if (onDecided) onDecided()
+      else q.refetch()
+ main
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to approve discount')
     }
   }
 
+ preeti
   const columns = [
     { key: 'id', header: 'Request ID', render: (r) => <span className="font-mono text-xs text-slate-500">{shortId(r._id)}</span> },
     { key: 'employee', header: 'Requested By', render: (r) => r.discountRequest?.requestedByName || r.bookedBy?.name || '—' },
@@ -244,6 +314,142 @@ function DiscountsTab({ q, search }) {
         />
       )}
     </>
+
+  const handleReject = async (booking) => {
+    const note = promptRemarks('Reject discount request')
+    if (!note) return
+    try {
+      await bookingsApi.decideDiscount(booking._id, { decision: 'reject', note })
+      toast.success('Discount request rejected')
+      if (onDecided) onDecided()
+      else q.refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reject discount')
+    }
+  }
+
+  const columns = [
+    {
+      key: 'id',
+      header: 'Booking ID',
+      render: (r) => (
+        <span className="font-mono text-xs font-semibold text-slate-700" title={r._id}>
+          {shortId(r._id)}
+        </span>
+      ),
+    },
+    {
+      key: 'executive',
+      header: 'Sales Executive',
+      render: (r) => (
+        <div>
+          <div className="font-medium text-slate-800">
+            {r.discountRequest?.requestedByName || r.bookedBy?.name || '—'}
+          </div>
+          {r.bookedBy?.branch && (
+            <div className="text-[11px] text-slate-400">{r.bookedBy.branch}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (r) => (
+        <div>
+          <div className="text-slate-800">{r.customer?.name || '—'}</div>
+          {r.customer?.mobile && <div className="text-[11px] text-slate-400">{r.customer.mobile}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'project',
+      header: 'Project · Unit',
+      render: (r) => `${r.project?.name || '—'} · Unit ${r.unit?.unitNumber || '—'}`,
+    },
+    {
+      key: 'saleAmount',
+      header: 'Original Sale',
+      render: (r) => formatMoney(r.discountRequest?.saleAmount || r.totalValue || 0),
+    },
+    {
+      key: 'requestedDiscount',
+      header: 'Requested Discount',
+      render: (r) => {
+        const dr = r.discountRequest
+        return (
+          <div>
+            <div className="font-semibold text-emerald-600">{formatMoney(dr?.totalDiscount || 0)}</div>
+            <div className="text-[11px] text-slate-400">
+              Firm: {formatMoney(dr?.firmDiscount || 0)} · Builder: {formatMoney(dr?.builderDiscount || 0)}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'finalAmount',
+      header: 'Final Sale Amount',
+      render: (r) => (
+        <span className="font-medium text-slate-900">
+          {formatMoney(r.discountRequest?.finalSaleAmount || 0)}
+        </span>
+      ),
+    },
+    {
+      key: 'remarks',
+      header: 'Remarks',
+      render: (r) => {
+        const dr = r.discountRequest
+        return (
+          <div className="max-w-[200px]">
+            <p className="truncate text-xs text-slate-600" title={dr?.remarks || ''}>
+              {dr?.remarks || '—'}
+            </p>
+            {dr?.supportingDocument?.fileUrl && (
+              <a
+                href={dr.supportingDocument.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline"
+              >
+                📎 Doc
+              </a>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'on',
+      header: 'Requested On',
+      render: (r) => formatDate(r.discountRequest?.requestedAt || r.createdAt),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (r) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="success" onClick={() => handleApprove(r)}>
+            Approve
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => handleReject(r)}>
+            Reject
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <Card className="p-5">
+      {q.loading ? (
+        <Loader />
+      ) : (
+        <Table columns={columns} rows={rows} empty="No discount requests awaiting approval." />
+      )}
+    </Card>
+ main
   )
 }
 

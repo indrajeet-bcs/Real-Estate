@@ -219,6 +219,7 @@ function DashboardTab({ kpis, tickets, loading, onOpen, onGoTickets, canReopen }
   )
 }
 
+ preeti
 function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, setSearch, setStatus, setPriority, reset, onPage, onPageSize, canReopen }) {
   const hasActiveFilters = Boolean(filters.search?.trim() || filters.status || filters.priority)
 
@@ -231,6 +232,29 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
     { value: '', label: 'All Priorities' },
     ...PRIORITIES.map((p) => ({ value: p, label: p })),
   ]
+
+function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, setSearch, setStatus, setPriority, reset, onPage, onPageSize }) {
+  const { user } = useAuth()
+  const toast = useToast()
+  const canDelete = user?.role === 'admin' || user?.role === 'sub_admin' || user?.role === 'super_admin'
+  const [ticketToDelete, setTicketToDelete] = useState(null)
+  const [deletingTicket, setDeletingTicket] = useState(false)
+
+  const handleConfirmDeleteTicket = async () => {
+    if (!ticketToDelete) return
+    setDeletingTicket(true)
+    try {
+      await ticketsApi.remove(ticketToDelete._id)
+      toast.success(`Ticket ${ticketToDelete.ticketId} deleted successfully`)
+      setTicketToDelete(null)
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete ticket')
+    } finally {
+      setDeletingTicket(false)
+    }
+  }
+ main
 
   return (
     <div className="space-y-5">
@@ -351,6 +375,7 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
                     <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                     <td className="px-4 py-3 text-xs text-slate-500">{formatDate(t.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
+ preeti
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
                           size="sm"
@@ -378,6 +403,20 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
                           >
                             <span className="material-symbols-outlined text-[15px]">restart_alt</span>
                             <span>Reopen</span>
+
+                      <div className="flex justify-end items-center gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => onOpen(t._id)}>View</Button>
+                        {canDelete && t.status === 'Closed' && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setTicketToDelete(t)
+                            }}
+                          >
+                            Delete
+ main
                           </Button>
                         )}
                       </div>
@@ -390,6 +429,36 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
         )}
         <div className="border-t border-slate-200 p-2"><Pagination meta={meta} onPage={onPage} onPageSize={onPageSize} loading={loading} /></div>
       </Card>
+
+      {/* Delete ticket confirmation popup */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">Confirm Delete</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Are you sure you want to permanently delete ticket <span className="font-semibold text-slate-700">{ticketToDelete.ticketId}</span>? This action cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setTicketToDelete(null)}
+                disabled={deletingTicket}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteTicket}
+                disabled={deletingTicket}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingTicket ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -431,6 +500,23 @@ function CategoriesTab() {
   const [targetCat, setTargetCat] = useState(null)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
+  const [catToDelete, setCatToDelete] = useState(null)
+  const [deletingCat, setDeletingCat] = useState(false)
+
+  const handleConfirmDeleteCat = async () => {
+    if (!catToDelete) return
+    setDeletingCat(true)
+    try {
+      await ticketCategoriesApi.remove(catToDelete._id)
+      toast.success('Category deleted')
+      setCatToDelete(null)
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not delete category')
+    } finally {
+      setDeletingCat(false)
+    }
+  }
 
   const openAdd = () => {
     setTargetCat(null)
@@ -478,16 +564,7 @@ function CategoriesTab() {
     }
   }
 
-  const handleDelete = async (cat) => {
-    if (!window.confirm(`Are you sure you want to delete category "${cat.name}"?`)) return
-    try {
-      await ticketCategoriesApi.remove(cat._id)
-      toast.success('Category deleted')
-      refetch()
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not delete category')
-    }
-  }
+
 
   const categories = data || []
 
@@ -542,7 +619,7 @@ function CategoriesTab() {
                           <Button size="sm" variant="secondary" onClick={() => openEdit(cat)}>
                             Edit
                           </Button>
-                          <Button size="sm" variant="danger" onClick={() => handleDelete(cat)}>
+                          <Button size="sm" variant="danger" onClick={() => setCatToDelete(cat)}>
                             Delete
                           </Button>
                         </div>
@@ -583,6 +660,36 @@ function CategoriesTab() {
               </div>
             </form>
           </Card>
+        </div>
+      )}
+
+      {/* Delete category confirmation popup */}
+      {catToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">Confirm Delete Category</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Are you sure you want to delete category <span className="font-semibold text-slate-700">"{catToDelete.name}"</span>? Any tickets assigned to this category will become unassigned.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCatToDelete(null)}
+                disabled={deletingCat}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteCat}
+                disabled={deletingCat}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingCat ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

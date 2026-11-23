@@ -50,6 +50,7 @@ export const NAV_BY_ROLE = {
   // Admin (Company Owner) — grouped IA ported from the rera-saas-admin-portal flow.
   [ROLES.ADMIN]: [
     { label: 'Dashboard', path: '/admin', icon: 'dashboard' },
+    { label: 'Action Center', path: '/admin/action', icon: 'bolt' },
     { label: 'Customer Support', path: '/admin/support', icon: 'support_agent' },
     { type: 'group', label: 'Consoles' },
     { label: 'Regional Branches', path: '/admin/branches', icon: 'location_city' },

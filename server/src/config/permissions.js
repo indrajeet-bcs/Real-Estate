@@ -30,7 +30,11 @@ export const ROLE_PERMISSIONS = {
     [MODULES.PROJECT]: ['view', 'create', 'edit', 'delete'],
     [MODULES.UNIT]: ['view', 'create', 'edit', 'delete'],
     [MODULES.CUSTOMER]: ['view', 'create', 'edit', 'delete'], // Phase 4 ✅ (KYC, ownership, creation)
+ preeti
     [MODULES.LEAD]: ['view', 'create', 'edit', 'delete', 'assign'], // Phase 4 ✅
+
+    [MODULES.LEAD]: ['view', 'create', 'edit', 'assign', 'delete'], // Phase 4 ✅
+ main
     [MODULES.FOLLOWUP]: ['view', 'create', 'edit'],
     [MODULES.VISIT]: ['view', 'create', 'edit'],
     [MODULES.BOOKING]: ['view', 'create', 'edit'], // Phase 5 ✅

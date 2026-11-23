@@ -1,7 +1,12 @@
 import { Router } from 'express'
 import * as ctrl from '../controllers/customer.controller.js'
 import { authenticate } from '../middleware/auth.js'
+ preeti
 import { requirePermission, requireRole } from '../middleware/rbac.js'
+
+import { requirePermission } from '../middleware/rbac.js'
+import { requireRole } from '../middleware/rbac.js'
+ main
 import { ApiError } from '../utils/ApiError.js'
 import { can } from '../config/permissions.js'
 import { validate } from '../middleware/validate.js'
