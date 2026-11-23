@@ -1,8 +1,14 @@
+export function getCleanPhoneNumber(val) {
+  if (!val) return ''
+  const str = String(val).trim()
+  return str.replace(/[^\d+]/g, '')
+}
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { customersApi, projectsApi, unitsApi, bookingsApi, leadTransfersApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { formatDate, formatMoney, titleCase } from '../../lib/format.js'
 import { CUSTOMER_STATUS } from '../../lib/constants.js'
 import {
@@ -24,6 +30,9 @@ const BOOKED_STATES = ['confirmed', 'sale_completed']
 export default function MyCustomersPage() {
   const navigate = useNavigate()
   const toast = useToast()
+  const { can } = useAuth()
+  const canCreateCustomer = can('customer', 'create') || can('lead', 'create')
+  const canEditCustomer = can('customer', 'edit') || can('lead', 'edit')
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -143,73 +152,112 @@ export default function MyCustomersPage() {
 
   function call(r) {
     if (!r) return
-    const rawNumber = String(r.mobile || r.phone || '').trim()
-    const cleanNumber = rawNumber.replace(/[^\d+]/g, '')
+    const cleanNumber = getCleanPhoneNumber(r.mobile || r.phone)
     if (!cleanNumber) {
       toast.error(`No phone number available for ${r.name || 'this customer'}.`)
       return
     }
 
-    // Auto-copy to clipboard for desktop softphone/dialer use
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(cleanNumber).catch(() => {})
-    }
-
-    // Trigger standard tel: protocol handler
     try {
-      const a = document.createElement('a')
-      a.href = `tel:${cleanNumber}`
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      setTimeout(() => {
-        try { document.body.removeChild(a) } catch (_) {}
-      }, 100)
-    } catch (_) {
-      window.location.href = `tel:${cleanNumber}`
-    }
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(cleanNumber).catch(() => {})
+      }
+    } catch (_) {}
 
-    toast.info(`Dialing ${cleanNumber} (${r.name}). Number copied to clipboard!`)
-    setCallModalFor(r)
+    toast.success(`Launching dialer for ${cleanNumber} (${r.name}). Number copied to clipboard!`)
+    window.location.href = `tel:${cleanNumber}`
   }
   const refetchAll = () => { refetch(); refetchReq() }
 
   const columns = [
-    { key: 'name', header: 'Customer', render: (r) => (
-      <div className="min-w-[9rem]">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); navigate(`/executive/customers/${r._id}`) }}
-          className="group flex items-center gap-1 text-left font-semibold text-slate-900 hover:text-blue-600 hover:underline cursor-pointer"
-          title="Open Full Profile"
-        >
-          <span>{r.name}</span>
-          <span className="material-symbols-outlined text-[13px] opacity-0 group-hover:opacity-100 transition-opacity text-blue-600">open_in_new</span>
-        </button>
-        <div className="text-xs text-slate-500">{r.mobile}</div>
-        {pendingByCustomer[String(r._id)] && <span className="mt-0.5 inline-block rounded bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">Transfer pending</span>}
-      </div>
-    ) },
+    { key: 'name', header: 'Customer', render: (r) => {
+      const cleanNum = getCleanPhoneNumber(r.mobile || r.phone)
+      return (
+        <div className="min-w-[9rem]">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); navigate(`/executive/customers/${r._id}`) }}
+            className="group flex items-center gap-1 text-left font-semibold text-slate-900 hover:text-blue-600 hover:underline cursor-pointer"
+            title="Open Full Profile"
+          >
+            <span>{r.name}</span>
+            <span className="material-symbols-outlined text-[13px] opacity-0 group-hover:opacity-100 transition-opacity text-blue-600">open_in_new</span>
+          </button>
+          {cleanNum ? (
+            <a
+              href={`tel:${cleanNum}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                try {
+                  if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(cleanNum).catch(() => {})
+                } catch (_) {}
+                toast.success(`Launching dialer for ${cleanNum} (${r.name})...`)
+              }}
+              className="text-xs text-slate-600 hover:text-emerald-700 hover:underline inline-flex items-center gap-1 mt-0.5 cursor-pointer font-medium"
+              title={`Click to call ${cleanNum}`}
+            >
+              <span className="material-symbols-outlined text-[13px] text-emerald-600">call</span>
+              <span>{r.mobile}</span>
+            </a>
+          ) : (
+            <div className="text-xs text-slate-400 mt-0.5">{r.mobile || 'No phone number'}</div>
+          )}
+          {pendingByCustomer[String(r._id)] && <span className="mt-0.5 inline-block rounded bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">Transfer pending</span>}
+        </div>
+      )
+    } },
     { key: 'budget', header: 'Budget', render: (r) => inr(r.budgetMax || r.budgetMin) },
     { key: 'project', header: 'Interested Project', render: (r) => custProject(r) || '—' },
     { key: 'booking', header: 'Booking Status', render: (r) => r.bookingStatus ? <StatusBadge status={r.bookingStatus} /> : <span className="text-slate-400">Not booked</span> },
     { key: 'last', header: 'Last Interaction', render: (r) => r.lastFollowUp ? formatDate(r.lastFollowUp) : <span className="text-slate-400">—</span> },
     { key: 'assigned', header: 'Assigned', render: (r) => formatDate(r.assignedAt || r.createdAt) },
-    { key: 'actions', header: '', render: (r) => (
-      <div className="flex items-center justify-end gap-1.5">
-        <button
-          type="button"
-          title="Quick Summary Preview"
-          onClick={(e) => { e.stopPropagation(); setPreviewFor(r) }}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs hover:border-blue-300 hover:bg-blue-50/70 hover:text-blue-700 transition cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-[15px] text-blue-600">visibility</span>
-          <span>Preview</span>
-        </button>
-        <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); call(r) }}>Call</Button>
-        <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); setSheetFor(r) }}>Actions ▾</Button>
-      </div>
-    ) },
+    { key: 'actions', header: '', render: (r) => {
+      const cleanNum = getCleanPhoneNumber(r.mobile || r.phone)
+      return (
+        <div className="flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            title="Quick Summary Preview"
+            onClick={(e) => { e.stopPropagation(); setPreviewFor(r) }}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs hover:border-blue-300 hover:bg-blue-50/70 hover:text-blue-700 transition cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[15px] text-blue-600">visibility</span>
+            <span>Preview</span>
+          </button>
+          {cleanNum ? (
+            <a
+              href={`tel:${cleanNum}`}
+              title={`Call ${r.name} (${cleanNum})`}
+              onClick={(e) => {
+                e.stopPropagation()
+                try {
+                  if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(cleanNum).catch(() => {})
+                } catch (_) {}
+                toast.success(`Launching dialer for ${cleanNum} (${r.name}). Number copied to clipboard!`)
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs hover:border-emerald-300 hover:bg-emerald-50/70 hover:text-emerald-700 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[15px] text-emerald-600">call</span>
+              <span>Call</span>
+            </a>
+          ) : (
+            <button
+              type="button"
+              title="No phone number available"
+              onClick={(e) => {
+                e.stopPropagation()
+                toast.error(`No phone number available for ${r.name || 'this customer'}.`)
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-300 transition cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined text-[15px] text-slate-300">call</span>
+              <span>Call</span>
+            </button>
+          )}
+          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); setSheetFor(r) }}>Actions ▾</Button>
+        </div>
+      )
+    } },
   ]
 
   return (
@@ -217,7 +265,7 @@ export default function MyCustomersPage() {
       <PageHeader
         title="Customers"
         subtitle="Manage your assigned customers, maintain relationships, and track the customer journey from inquiry to booking."
-        actions={<Button onClick={() => setAdding(true)}>+ Add Customer</Button>}
+        actions={canCreateCustomer ? <Button onClick={() => setAdding(true)}>+ Add Customer</Button> : null}
       />
 
       {/* Top Summary Cards */}
@@ -390,6 +438,7 @@ export default function MyCustomersPage() {
         <ActionSheet
           customer={sheetFor}
           hasPendingTransfer={pendingByCustomer[String(sheetFor._id)]}
+          canEdit={canEditCustomer}
           onClose={() => setSheetFor(null)}
           onCall={() => { const r = sheetFor; setSheetFor(null); call(r) }}
           onPreview={() => { const r = sheetFor; setSheetFor(null); setPreviewFor(r) }}
@@ -451,14 +500,23 @@ function CustomerSummaryModal({ customer, projects = [], onClose, onViewProfile,
         <div className="flex w-full items-center justify-between gap-3">
           <Button variant="secondary" onClick={onClose}>Close</Button>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onCall}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px] text-emerald-600">call</span>
-              <span>Call</span>
-            </button>
+            {getCleanPhoneNumber(customer?.mobile || customer?.phone) ? (
+              <a
+                href={`tel:${getCleanPhoneNumber(customer?.mobile || customer?.phone)}`}
+                onClick={() => {
+                  const num = getCleanPhoneNumber(customer?.mobile || customer?.phone)
+                  try {
+                    if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(num).catch(() => {})
+                  } catch (_) {}
+                  toast.success(`Launching dialer for ${num} (${customer.name})...`)
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                title={`Call ${customer.name}`}
+              >
+                <span className="material-symbols-outlined text-[16px] text-emerald-600">call</span>
+                <span>Call ({customer.mobile})</span>
+              </a>
+            ) : null}
             {onFollowUp && (
               <Button size="sm" variant="secondary" onClick={onFollowUp}>
                 + Follow-up
@@ -566,15 +624,30 @@ function CustomerSummaryModal({ customer, projects = [], onClose, onViewProfile,
 }
 
 // ─── Per-row action sheet (spec §Customers Table · Actions) ─────────────────────
-function ActionSheet({ customer, hasPendingTransfer, onClose, onCall, onPreview, onView, onEdit, onFollowUp, onVisit, onBooking, onTransfer }) {
-  const alreadyBooked = BOOKED_STATES.includes(customer.bookingStatus)
+function ActionSheet({ customer, hasPendingTransfer, canEdit = true, onClose, onCall, onPreview, onView, onEdit, onFollowUp, onVisit, onBooking, onTransfer }) {
+  const alreadyBooked = BOOKED_STATES.includes(customer?.bookingStatus)
+  const cleanNum = getCleanPhoneNumber(customer?.mobile || customer?.phone)
+  const toast = useToast()
+
   const actions = [
     {
-      label: `Call ${customer.name}`,
+      label: `Call ${customer?.name || 'Customer'}`,
       icon: 'call',
-      description: customer.mobile ? `Dial ${customer.mobile} or open quick dialer` : 'No phone number available',
-      onClick: onCall,
-      disabled: !customer.mobile,
+      href: cleanNum ? `tel:${cleanNum}` : undefined,
+      description: cleanNum ? `Dial ${customer.mobile} instantly via device dialer` : 'No phone number available',
+      onClick: (e) => {
+        if (!cleanNum) {
+          e.preventDefault()
+          toast.error(`No phone number available for ${customer?.name || 'this customer'}.`)
+          return
+        }
+        try {
+          if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(cleanNum).catch(() => {})
+        } catch (_) {}
+        toast.success(`Launching dialer for ${cleanNum} (${customer.name}). Number copied to clipboard!`)
+        onClose()
+      },
+      disabled: !cleanNum,
     },
     {
       label: 'View Full Profile',
@@ -591,8 +664,15 @@ function ActionSheet({ customer, hasPendingTransfer, onClose, onCall, onPreview,
     {
       label: 'Edit Customer',
       icon: 'edit',
-      description: 'Update customer contact info, budget, and project interest',
-      onClick: onEdit,
+      description: canEdit ? 'Update customer contact info, budget, and project interest' : 'Permission required to edit customer details',
+      onClick: () => {
+        if (!canEdit) {
+          toast.error('You do not have permission to edit customers.')
+          return
+        }
+        onEdit()
+      },
+      disabled: !canEdit,
     },
     {
       label: 'Add Follow-up',
@@ -622,29 +702,51 @@ function ActionSheet({ customer, hasPendingTransfer, onClose, onCall, onPreview,
     },
   ]
   return (
-    <Modal open onClose={onClose} title={customer.name}
+    <Modal open onClose={onClose} title={customer?.name || 'Customer Options'}
       footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
     >
-      <p className="mb-3.5 text-xs text-slate-500">{customer.mobile} · {titleCase(customer.status)}</p>
+      <p className="mb-3.5 text-xs text-slate-500">{customer?.mobile || 'No mobile'} · {titleCase(customer?.status)}</p>
       <div className="grid grid-cols-1 gap-2.5">
-        {actions.map((a) => (
-          <button
-            key={a.label}
-            onClick={a.onClick}
-            disabled={a.disabled}
-            className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
-              a.disabled
-                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
-                : 'border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 cursor-pointer'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px] text-blue-600 mt-0.5">{a.icon}</span>
-            <div>
-              <div className="text-sm font-semibold text-slate-800">{a.label}</div>
-              {a.description && <div className="text-xs text-slate-500 mt-0.5">{a.description}</div>}
-            </div>
-          </button>
-        ))}
+        {actions.map((a) => {
+          if (a.href) {
+            return (
+              <a
+                key={a.label}
+                href={a.disabled ? undefined : a.href}
+                onClick={a.onClick}
+                className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+                  a.disabled
+                    ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400 pointer-events-none'
+                    : 'border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/70 cursor-pointer'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px] text-emerald-600 mt-0.5">{a.icon}</span>
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">{a.label}</div>
+                  {a.description && <div className="text-xs text-slate-500 mt-0.5">{a.description}</div>}
+                </div>
+              </a>
+            )
+          }
+          return (
+            <button
+              key={a.label}
+              onClick={a.onClick}
+              disabled={a.disabled}
+              className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+                a.disabled
+                  ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
+                  : 'border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 cursor-pointer'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px] text-blue-600 mt-0.5">{a.icon}</span>
+              <div>
+                <div className="text-sm font-semibold text-slate-800">{a.label}</div>
+                {a.description && <div className="text-xs text-slate-500 mt-0.5">{a.description}</div>}
+              </div>
+            </button>
+          )
+        })}
       </div>
     </Modal>
   )

@@ -46,7 +46,6 @@ async function seed() {
       backfilled += r.modifiedCount || 0
     }
     await Notification.updateMany({ priority: { $in: [null, undefined] } }, { $set: { priority: 'medium' } })
-
     const firms = await Firm.find({ isDeleted: { $ne: true } })
     let created = 0
     const TARGET = 10

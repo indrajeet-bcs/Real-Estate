@@ -67,9 +67,18 @@ export default function ExecutiveLayout() {
 
         {/* App header */}
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-600">RERASales Mobile CRM</div>
-            <div className="text-sm font-semibold text-slate-900">{title}</div>
+          <div className="flex items-center gap-2.5 min-w-0">
+            {user.firm?.logo ? (
+              <img src={user.firm.logo} alt="Logo" className="h-8 max-h-8 max-w-[90px] object-contain rounded" />
+            ) : (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-700 to-indigo-600 text-white shadow-xs">
+                <span className="material-symbols-outlined text-[18px]">apartment</span>
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 truncate">{user.firm?.name || 'Real Estate CRM'}</div>
+              <div className="text-sm font-semibold text-slate-900 truncate">{title}</div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <NotificationBell />

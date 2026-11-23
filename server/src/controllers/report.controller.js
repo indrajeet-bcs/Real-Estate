@@ -657,8 +657,12 @@ export const subAdminOverview = asyncHandler(async (req, res) => {
     todaysLeads, scheduledVisitsToday, monthlyBookings, revenueAgg,
     presentToday, onLeaveToday, pendingLeaves, reservedBookings, heldUnits, unassignedLeads,
     followDue, followCompleted, followOverdue,
+ preeti
+    upcomingVisits, leadSourceAgg, recentActivity, collectedAgg, trendDocs, pendingDiscounts,
+
     upcomingVisits, leadSourceAgg, recentActivity, collectedAgg, trendDocs,
     pendingDiscounts,
+ main
   ] = await Promise.all([
     Customer.countDocuments({ firm, assignedTo: { $in: teamIds }, createdAt: { $gte: todayStart, $lte: todayEnd } }),
     SiteVisit.countDocuments({ firm, assignedTo: { $in: teamIds }, scheduledAt: { $gte: todayStart, $lte: todayEnd } }),
@@ -731,7 +735,11 @@ export const subAdminOverview = asyncHandler(async (req, res) => {
     },
     topAlerts: allAlerts.slice(0, 3),
     alertsTotal: allAlerts.reduce((s, a) => s + a.count, 0),
+ preeti
+    actionCenter: { pendingDiscounts, pendingLeaves, reservedBookings, heldUnits, unassignedLeads, total: pendingDiscounts + pendingLeaves + reservedBookings + heldUnits + unassignedLeads },
+
     actionCenter: { pendingLeaves, reservedBookings, pendingDiscounts, heldUnits, unassignedLeads, total: pendingLeaves + reservedBookings + pendingDiscounts + heldUnits + unassignedLeads },
+ main
     followUps: { due: followDue, completed: followCompleted, overdue: followOverdue },
     upcomingVisits,
     teamPerformance: perf,
