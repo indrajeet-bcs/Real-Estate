@@ -27,7 +27,6 @@ export default function DashboardLayout() {
   const [actionCount, setActionCount] = useState(0)
   const [geofenceRadius, setGeofenceRadius] = useState(200)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
- preeti
   const [branding, setBranding] = useState(() => {
     try {
       const cached = localStorage.getItem('crm_branding')
@@ -71,7 +70,6 @@ export default function DashboardLayout() {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const profileMenuRef = useRef(null)
   const profilePath = PROFILE_PATHS[user.role] || '/admin/profile'
- main
 
   // Mobile drawer open state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)

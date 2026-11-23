@@ -219,8 +219,12 @@ function DashboardTab({ kpis, tickets, loading, onOpen, onGoTickets, canReopen }
   )
 }
 
- preeti
 function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, setSearch, setStatus, setPriority, reset, onPage, onPageSize, canReopen }) {
+  const { user } = useAuth()
+  const toast = useToast()
+  const canDelete = user?.role === 'admin' || user?.role === 'sub_admin' || user?.role === 'super_admin'
+  const [ticketToDelete, setTicketToDelete] = useState(null)
+  const [deletingTicket, setDeletingTicket] = useState(false)
   const hasActiveFilters = Boolean(filters.search?.trim() || filters.status || filters.priority)
 
   const statusOptions = [
@@ -232,13 +236,6 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
     { value: '', label: 'All Priorities' },
     ...PRIORITIES.map((p) => ({ value: p, label: p })),
   ]
-
-function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, setSearch, setStatus, setPriority, reset, onPage, onPageSize }) {
-  const { user } = useAuth()
-  const toast = useToast()
-  const canDelete = user?.role === 'admin' || user?.role === 'sub_admin' || user?.role === 'super_admin'
-  const [ticketToDelete, setTicketToDelete] = useState(null)
-  const [deletingTicket, setDeletingTicket] = useState(false)
 
   const handleConfirmDeleteTicket = async () => {
     if (!ticketToDelete) return
@@ -254,7 +251,6 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
       setDeletingTicket(false)
     }
   }
- main
 
   return (
     <div className="space-y-5">
@@ -375,7 +371,6 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
                     <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                     <td className="px-4 py-3 text-xs text-slate-500">{formatDate(t.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
- preeti
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
                           size="sm"
@@ -403,9 +398,8 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
                           >
                             <span className="material-symbols-outlined text-[15px]">restart_alt</span>
                             <span>Reopen</span>
-
-                      <div className="flex justify-end items-center gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => onOpen(t._id)}>View</Button>
+                          </Button>
+                        )}
                         {canDelete && t.status === 'Closed' && (
                           <Button
                             size="sm"
@@ -416,7 +410,6 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
                             }}
                           >
                             Delete
- main
                           </Button>
                         )}
                       </div>

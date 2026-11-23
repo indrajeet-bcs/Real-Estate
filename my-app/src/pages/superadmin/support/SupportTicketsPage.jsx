@@ -288,49 +288,32 @@ export default function SupportTicketsPage() {
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="secondary" onClick={() => openModal('view', t)}>View</Button>
- preeti
                           <ActionDropdown
                             label="Actions"
                             items={[
-                              { key: 'reply', label: 'Reply', icon: 'reply', onClick: () => handleAction('reply') },
+                              { key: 'reply', label: 'Reply', icon: 'reply', onClick: () => openModal('reply', t) },
                               { key: 'status', label: 'Change Status', icon: 'sync', onClick: () => openModal('status', t) },
                               ...(t.status === 'Closed' || t.status === 'Resolved' ? [{
                                 key: 'reopen',
                                 label: 'Reopen Ticket',
                                 icon: 'restart_alt',
-                                onClick: () => openModal('status', t)
+                                onClick: () => {
+                                  setSelectedTicket(t)
+                                  setNewStatus('Open')
+                                  setNote('')
+                                  setActionModal('status')
+                                }
                               }] : []),
                               { key: 'assign', label: 'Assign', icon: 'person_add', onClick: () => openModal('assign', t) },
                               { key: 'note', label: 'Add Note', icon: 'edit_note', onClick: () => openModal('note', t) },
+                              ...(t.status === 'Closed' ? [{
+                                key: 'delete',
+                                label: 'Delete Ticket',
+                                icon: 'delete',
+                                onClick: () => setTicketToDelete(t)
+                              }] : []),
                             ]}
                           />
-
-                          <Select 
-                            className="!py-1 !text-xs !w-24 bg-white"
-                            value=""
-                            onChange={(e) => {
-                              if (e.target.value === 'status') openModal('status', t)
-                              if (e.target.value === 'note') openModal('note', t)
-                              if (e.target.value === 'reply') handleAction('reply')
-                              if (e.target.value === 'assign') openModal('assign', t)
-                              if (e.target.value === 'reopen') {
-                                setSelectedTicket(t)
-                                setNewStatus('Open')
-                                setNote('')
-                                setActionModal('status')
-                              }
-                              if (e.target.value === 'delete') setTicketToDelete(t)
-                            }}
-                          >
-                            <option value="" disabled>Actions...</option>
-                            <option value="reply">Reply</option>
-                            <option value="status">Change Status</option>
-                            <option value="assign">Assign</option>
-                            <option value="note">Add Note</option>
-                            {(t.status === 'Resolved' || t.status === 'Closed') && <option value="reopen">Reopen Ticket</option>}
-                            {t.status === 'Closed' && <option value="delete">Delete Ticket</option>}
-                          </Select>
- main
                         </div>
                       </td>
                     </tr>

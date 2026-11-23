@@ -214,30 +214,6 @@ export const updateTicket = asyncHandler(async (req, res) => {
 })
 
 export const changeTicketStatus = asyncHandler(async (req, res) => {
- preeti
-  const { status, note, reason } = req.body
-  const existingTicket = await Ticket.findOne(ownFilter(req))
-  if (!existingTicket) throw ApiError.notFound('Ticket not found')
-
-  const wasClosedOrResolved = existingTicket.status === 'Closed' || existingTicket.status === 'Resolved'
-  const isReopening = wasClosedOrResolved && (status === 'Open' || status === 'In Progress')
-
-  // Reopening closed or resolved tickets requires administrative privilege
-  if (isReopening) {
-    const allowedRoles = [ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SUPER_ADMIN]
-    if (!allowedRoles.includes(req.user.role)) {
-      throw ApiError.forbidden('Only authorized administrators can reopen closed or resolved tickets')
-    }
-  }
-
-  const prevStatus = existingTicket.status
-  existingTicket.status = status
-
-  const noteMessage = note || reason || (isReopening ? `Ticket reopened by ${req.user.name || 'Admin'} (Status changed from ${prevStatus} to ${status})` : null)
-  if (noteMessage) {
-    existingTicket.internalNotes.push({
-      note: typeof noteMessage === 'string' ? noteMessage.trim() : `Status changed to ${status}`,
-
   const { status, remark, note } = req.body
   if (!status) throw ApiError.badRequest('Status is required')
 
@@ -253,6 +229,14 @@ export const changeTicketStatus = asyncHandler(async (req, res) => {
 
   const previousStatus = ticket.status
   const isReopening = (previousStatus === 'Resolved' || previousStatus === 'Closed') && (status === 'Open' || status === 'In Progress')
+
+  // Reopening closed or resolved tickets requires administrative privilege
+  if (isReopening) {
+    const allowedRoles = [ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SUPER_ADMIN]
+    if (!allowedRoles.includes(req.user.role)) {
+      throw ApiError.forbidden('Only authorized administrators can reopen closed or resolved tickets')
+    }
+  }
 
   if ((status === 'Resolved' || status === 'Closed') && !resolutionText) {
     throw ApiError.badRequest(`A mandatory description/remark is required when marking a ticket as ${status}`)
@@ -300,23 +284,10 @@ export const changeTicketStatus = asyncHandler(async (req, res) => {
   } else if (resolutionText) {
     ticket.internalNotes.push({
       note: `[Status changed to ${status}] ${resolutionText}`,
- main
       addedBy: req.user._id,
       createdAt: new Date(),
     })
   }
-
- preeti
-  await existingTicket.save()
-
-  const populated = await Ticket.findById(existingTicket._id)
-    .populate('firm', 'name companyId contactEmail contactPhone region')
-    .populate('category', 'name')
-    .populate('assignedTo', 'name email')
-    .populate('internalNotes.addedBy', 'name role')
-    .lean()
-
-  return ok(res, populated, isReopening ? `Ticket reopened successfully (${status})` : `Status changed to ${status}`)
 
   await ticket.save()
 
@@ -341,8 +312,7 @@ export const changeTicketStatus = asyncHandler(async (req, res) => {
     .populate('internalNotes.addedBy', 'name role')
     .lean()
 
-  return ok(res, populated, `Ticket status changed to ${status}`)
- main
+  return ok(res, populated, isReopening ? `Ticket reopened successfully (${status})` : `Ticket status changed to ${status}`)
 })
 
 export const assignTicket = asyncHandler(async (req, res) => {

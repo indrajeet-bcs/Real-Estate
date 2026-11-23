@@ -2,10 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, Button, StatusBadge, useBodyScrollLock } from '../../components/ui.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
- preeti
 import { ROLES } from '../../lib/constants.js'
-
- main
 import { ticketsApi } from '../../api/resources.js'
 import { formatDate, titleCase } from '../../lib/format.js'
 
@@ -16,22 +13,16 @@ const priorityCls = (p) =>
   p === 'Critical' ? 'bg-red-100 text-red-700' : p === 'High' ? 'bg-orange-100 text-orange-700' : p === 'Medium' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
 
 export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
- preeti
   useBodyScrollLock(true)
   const toast = useToast()
   const { user } = useAuth()
-
-  const { user } = useAuth()
-  const toast = useToast()
   const canDelete = user?.role === 'admin' || user?.role === 'sub_admin' || user?.role === 'super_admin'
- main
   const [ticket, setTicket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [remark, setRemark] = useState('')
   const [saving, setSaving] = useState(false)
   const [busyStatus, setBusyStatus] = useState(false)
- preeti
   const [reopenModalOpen, setReopenModalOpen] = useState(false)
   const [reopenReason, setReopenReason] = useState('')
 
@@ -41,7 +32,9 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
   const [statusModal, setStatusModal] = useState(null) // 'Resolved' | 'Closed' | null
   const [statusRemark, setStatusRemark] = useState('')
   const [statusError, setStatusError] = useState('')
- main
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletingTicket, setDeletingTicket] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -100,7 +93,6 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
     }
   }
 
- preeti
   const handleReopen = async (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault()
     setBusyStatus(true)
@@ -117,9 +109,8 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
       toast.error(err.response?.data?.message || 'Failed to reopen ticket')
     } finally {
       setBusyStatus(false)
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deletingTicket, setDeletingTicket] = useState(false)
+    }
+  }
 
   const handleConfirmDelete = async () => {
     setDeletingTicket(true)
@@ -133,7 +124,6 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
       toast.error(err.response?.data?.message || 'Failed to delete ticket')
     } finally {
       setDeletingTicket(false)
- main
     }
   }
 
@@ -179,28 +169,6 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
           </div>
           <div className="flex items-center gap-2">
             {!resolvedOrClosed && (
- preeti
-              <Button size="sm" variant="secondary" disabled={busyStatus} onClick={() => changeStatus('Resolved')}>
-                Mark Resolved
-              </Button>
-            )}
-            {ticket.status === 'Resolved' && (
-              <Button size="sm" variant="secondary" disabled={busyStatus} onClick={() => changeStatus('Closed')}>
-                Close
-              </Button>
-            )}
-            {resolvedOrClosed && canReopen && (
-              <Button
-                size="sm"
-                variant="primary"
-                disabled={busyStatus}
-                onClick={() => setReopenModalOpen(true)}
-                className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
-                title="Reopen ticket for further follow-up"
-              >
-                <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                <span>Reopen Ticket</span>
-
               <Button
                 size="sm"
                 variant="secondary"
@@ -220,7 +188,7 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
                 Close
               </Button>
             )}
-            {resolvedOrClosed && (
+            {resolvedOrClosed && canReopen && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -238,7 +206,6 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
                 onClick={() => setShowDeleteConfirm(true)}
               >
                 Delete Ticket
- main
               </Button>
             )}
             <button onClick={onClose} className="ml-2 rounded-full p-2 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700">✕</button>
@@ -379,62 +346,6 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
         </div>
       </div>
 
- preeti
-      {/* Reopen Ticket Confirmation Modal */}
-      {reopenModalOpen && (
-        <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs overscroll-contain"
-          onClick={() => setReopenModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 overscroll-contain"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-2.5 mb-2 text-slate-900">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <span className="material-symbols-outlined text-[20px]">restart_alt</span>
-              </span>
-              <h3 className="text-base font-semibold">Reopen Support Ticket</h3>
-            </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Reopening <strong className="text-slate-800 font-mono">{ticket.ticketId}</strong> will transition status back to <strong className="text-blue-600">Open</strong> and allow further follow-up and notes.
-            </p>
-            <form onSubmit={handleReopen} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Follow-up Reason / Remarks
-                </label>
-                <textarea
-                  rows={3}
-                  value={reopenReason}
-                  onChange={(e) => setReopenReason(e.target.value)}
-                  placeholder="Specify why this ticket is being reopened (e.g. Issue recurring, customer requested review)..."
-                  className="w-full rounded-xl border border-slate-300 p-3 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
-                />
-              </div>
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={busyStatus}
-                  onClick={() => setReopenModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  loading={busyStatus}
-                  className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <span className="material-symbols-outlined text-[15px]">restart_alt</span>
-                  Confirm Reopen
-                </Button>
-              </div>
-            </form>
-
       {/* Mandatory Resolution / Closing Remarks Modal */}
       {statusModal && (
         <div
@@ -549,7 +460,6 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
                 {deletingTicket ? 'Deleting...' : 'Yes, Delete'}
               </button>
             </div>
- main
           </div>
         </div>
       )}
