@@ -118,30 +118,30 @@ function Navbar() {
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pb-24 pt-36 text-white">
+    <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/80 via-indigo-50/30 to-white pb-24 pt-36">
       {/* Background decoration */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="absolute -top-40 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-blue-400/10 blur-3xl" />
+        <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-indigo-400/10 blur-3xl" />
       </div>
 
       <div className="relative mx-auto max-w-5xl px-6 text-center">
         {/* Badge */}
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1.5 text-xs font-medium text-blue-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-xs font-semibold text-blue-700 shadow-2xs">
+          <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
           Built for Indian Real Estate Teams
         </div>
 
         {/* Headline */}
-        <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+        <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
           Close More Deals with
           <br />
-          <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             Smart CRM for Real Estate
           </span>
         </h1>
 
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-300">
+        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600 font-normal">
           Manage leads, follow-ups, site visits, bookings, and your entire sales team — all from
           one powerful platform designed for real estate agencies.
         </p>
@@ -150,24 +150,24 @@ function Hero() {
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link
             to="/login"
-            className="rounded-xl bg-blue-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-900/40 transition hover:bg-blue-500 hover:-translate-y-0.5 active:translate-y-0"
+            className="rounded-xl bg-blue-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-700 hover:-translate-y-0.5 active:translate-y-0"
           >
             Login to Dashboard →
           </Link>
           <a
             href="#features"
-            className="rounded-xl border border-white/20 bg-white/5 px-8 py-3.5 text-base font-semibold text-white backdrop-blur-sm transition hover:bg-white/10"
+            className="rounded-xl border border-slate-300 bg-white px-8 py-3.5 text-base font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:border-slate-400 hover:-translate-y-0.5"
           >
             Explore Features
           </a>
         </div>
 
         {/* Stats bar */}
-        <div className="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-6 sm:grid-cols-4">
+        <div className="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-5 sm:grid-cols-4">
           {STATS.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-5 backdrop-blur-sm">
-              <div className="text-3xl font-bold text-white">{s.value}</div>
-              <div className="mt-1 text-xs text-slate-400">{s.label}</div>
+            <div key={s.label} className="rounded-2xl border border-slate-200/90 bg-white/95 px-4 py-5 shadow-xs transition hover:shadow-md hover:border-blue-200">
+              <div className="text-3xl font-extrabold text-slate-900">{s.value}</div>
+              <div className="mt-1 text-xs font-medium text-slate-500">{s.label}</div>
             </div>
           ))}
         </div>
@@ -301,22 +301,22 @@ function Contact() {
 // ─── Footer ───────────────────────────────────────────────────────────────────
 function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-slate-900 py-10 text-center">
+    <footer className="border-t border-slate-200 bg-slate-50 py-10 text-center">
       <div className="mx-auto max-w-6xl px-6">
         <div className="flex items-center justify-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white shadow-2xs">
             RE
           </div>
-          <span className="text-sm font-medium text-slate-300">Real Estate CRM</span>
+          <span className="text-sm font-semibold text-slate-900">Real Estate CRM</span>
         </div>
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-slate-500">
           © {new Date().getFullYear()} Real Estate CRM. All rights reserved.
         </p>
         <div className="mt-4 flex items-center justify-center gap-6">
-          <Link to="/login" className="text-xs text-slate-500 transition hover:text-slate-300">Login</Link>
-          <a href="#features" className="text-xs text-slate-500 transition hover:text-slate-300">Features</a>
-          <a href="#how-it-works" className="text-xs text-slate-500 transition hover:text-slate-300">How It Works</a>
-          <a href="#contact" className="text-xs text-slate-500 transition hover:text-slate-300">Contact</a>
+          <Link to="/login" className="text-xs text-slate-600 transition hover:text-blue-600">Login</Link>
+          <a href="#features" className="text-xs text-slate-600 transition hover:text-blue-600">Features</a>
+          <a href="#how-it-works" className="text-xs text-slate-600 transition hover:text-blue-600">How It Works</a>
+          <a href="#contact" className="text-xs text-slate-600 transition hover:text-blue-600">Contact</a>
         </div>
       </div>
     </footer>
