@@ -28,6 +28,7 @@ router.post('/refresh', authCtrl.refresh)
 router.post('/logout', authCtrl.logout)
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), authCtrl.forgotPassword)
 router.post('/reset-password', authLimiter, validate(resetPasswordSchema), authCtrl.resetPassword)
+router.post('/set-password', authLimiter, validate(resetPasswordSchema), authCtrl.setPassword)
 
 router.get('/me', authenticate, authCtrl.me)
 router.patch('/profile', authenticate, validate(updateProfileSchema), authCtrl.updateMyProfile)

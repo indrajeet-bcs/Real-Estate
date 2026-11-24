@@ -270,10 +270,60 @@ export const resetPassword = asyncHandler(async (req, res) => {
   user.password = newPassword
   user.resetOtpHash = undefined
   user.resetOtpExpires = undefined
+  user.mustSetPassword = false
   user.refreshTokens = [] // force re-login everywhere
   await user.save()
 
   return ok(res, null, 'Password reset successful. Please log in.')
+})
+
+// POST /api/auth/set-password — activates account and sets permanent password via One-Time Password
+export const setPassword = asyncHandler(async (req, res) => {
+  const { email, otp, newPassword } = req.body
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  const cleanOtp = String(otp || '').trim()
+
+  const user = await User.findOne({ email: cleanEmail })
+    .select('+resetOtpHash +resetOtpExpires +password +refreshTokens')
+    .populate('customRole')
+    .populate('firm', 'name logo')
+
+  if (!user || !user.resetOtpHash || !user.resetOtpExpires) {
+    throw ApiError.badRequest('Invalid or expired One-Time Password')
+  }
+
+  if (user.resetOtpExpires.getTime() < Date.now() || user.resetOtpHash !== hashToken(cleanOtp)) {
+    throw ApiError.badRequest('Invalid or expired One-Time Password')
+  }
+
+  user.password = newPassword
+  user.resetOtpHash = undefined
+  user.resetOtpExpires = undefined
+  user.mustSetPassword = false
+  user.passwordChangedAt = new Date()
+  user.refreshTokens = []
+  await user.save()
+
+  // Issue tokens and log them in directly so they can transition straight to their dashboard
+  const accessToken = await issueTokens(res, user, {
+    lastLoginAt: new Date(),
+    lastLoginDevice: (req.headers['user-agent'] || '').slice(0, 200),
+  })
+
+  writeAudit({
+    req: { ...req, user },
+    action: AUDIT_ACTIONS.UPDATE,
+    module: 'user',
+    targetId: user._id,
+    targetLabel: user.name,
+    description: 'Set permanent password using One-Time Password (OTP)',
+  })
+
+  return ok(res, {
+    accessToken,
+    user: user.toJSON(),
+    permissions: effectivePermissions(user),
+  }, 'Password set successfully! Welcome to your dashboard.')
 })
 
 // POST /api/auth/change-password (authenticated)

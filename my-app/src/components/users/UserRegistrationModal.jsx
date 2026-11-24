@@ -138,7 +138,7 @@ export default function UserRegistrationModal({
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   const isEmailValid = isNew ? emailRegex.test(form.email.trim()) : true
   const isNameValid = form.name.trim().length >= 2
-  const isPasswordValid = isNew ? form.password.length >= 8 : (form.password ? form.password.length >= 8 : true)
+  const isPasswordValid = form.password ? form.password.length >= 8 : true
   const isPhoneValid = !form.phone || /^[0-9+ -]{7,15}$/.test(form.phone.trim())
 
   const canSubmit = isNameValid && isEmailValid && isPasswordValid && !busy
@@ -155,7 +155,6 @@ export default function UserRegistrationModal({
         const payload = {
           name: form.name.trim(),
           email: form.email.trim().toLowerCase(),
-          password: form.password,
           role: form.role,
           phone: form.phone.trim() || undefined,
           branch: form.branch || undefined,
@@ -170,9 +169,17 @@ export default function UserRegistrationModal({
           emergencyContactName: form.emergencyContactName.trim() || undefined,
           emergencyContactNumber: form.emergencyContactNumber.trim() || undefined,
         }
+        if (form.password && form.password.length >= 8) {
+          payload.password = form.password
+        }
         const res = await usersApi.create(payload)
-        toast.success(`User ${form.name} registered successfully!`)
-        onDone?.(res.data?.data || res.data)
+        const data = res.data?.data || res.data
+        if (data?.devOtp) {
+          toast.success(`User ${form.name} registered! One-Time Password email sent. (Dev OTP: ${data.devOtp})`)
+        } else {
+          toast.success(`User ${form.name} registered! An activation email with a One-Time Password has been sent to ${form.email}.`)
+        }
+        onDone?.(data)
       } else {
         const payload = {
           name: form.name.trim(),
@@ -373,8 +380,7 @@ export default function UserRegistrationModal({
             <div>
               <label className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-700">
                 <span>
-                  {isNew ? 'Initial Password' : 'Reset Password (Optional)'}{' '}
-                  {isNew && <span className="text-rose-500">*</span>}
+                  {isNew ? 'Initial Password (Optional)' : 'Reset Password (Optional)'}
                 </span>
                 {form.password && (
                   <span className={`text-[10px] font-medium ${form.password.length >= 8 ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -385,7 +391,7 @@ export default function UserRegistrationModal({
               <div className="relative">
                 <Input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder={isNew ? 'Min. 8 characters' : 'Leave blank to keep unchanged'}
+                  placeholder={isNew ? 'Leave blank to send One-Time Password (OTP) email' : 'Leave blank to keep unchanged'}
                   value={form.password}
                   onChange={(e) => setField('password', e.target.value)}
                 />
@@ -399,21 +405,21 @@ export default function UserRegistrationModal({
                   </span>
                 </button>
               </div>
-              {isNew && form.password && form.password.length < 8 && (
+              {form.password && form.password.length < 8 && (
                 <p className="mt-1 text-[11px] text-rose-500">Password must be at least 8 characters</p>
               )}
             </div>
           </div>
 
-          <div className="rounded-lg border border-blue-50 bg-blue-50/50 p-3 text-xs text-blue-800">
+          <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-800">
             <div className="flex items-center gap-1.5 font-semibold">
-              <span className="material-symbols-outlined text-[16px]">security</span>
-              <span>Account Credentials</span>
+              <span className="material-symbols-outlined text-[16px]">mail</span>
+              <span>One-Time Password &amp; Activation Email</span>
             </div>
-            <p className="mt-0.5 text-blue-700">
+            <p className="mt-1 text-blue-700 leading-relaxed">
               {isNew
-                ? 'The registered user can log in to the system using this Email and Password immediately.'
-                : 'Enter a new password only if the employee requested a password reset.'}
+                ? 'A welcome email containing a One-Time Password (OTP) and an activation link will be automatically sent to the employee’s email address. They will open the link, enter the OTP, and set their own secure password to activate their account.'
+                : 'Enter a new password only if the employee requested a manual password reset.'}
             </p>
           </div>
         </div>

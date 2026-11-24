@@ -7,6 +7,10 @@ import Attendance from '../models/Attendance.js'
 import Project from '../models/Project.js'
 import SiteVisit from '../models/SiteVisit.js'
 import AuditLog from '../models/AuditLog.js'
+import crypto from 'crypto'
+import { generateOtp, hashToken } from '../utils/token.js'
+import { sendNewUserInviteEmail } from '../utils/email.js'
+import { env, isProd } from '../config/env.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ok, created } from '../utils/apiResponse.js'
@@ -230,7 +234,8 @@ export const createUser = asyncHandler(async (req, res) => {
     throw ApiError.forbidden(`You cannot create a ${role}`)
   }
 
-  const exists = await User.findOne({ email: req.body.email })
+  const cleanEmail = (req.body.email || '').trim().toLowerCase()
+  const exists = await User.findOne({ email: cleanEmail })
   if (exists) throw ApiError.conflict('An account with that email already exists')
 
   // Auto-assign a sequential employee ID within the firm if none supplied.
@@ -240,8 +245,16 @@ export const createUser = asyncHandler(async (req, res) => {
     employeeId = `EMP-${String(count + 1).padStart(4, '0')}`
   }
 
+  // Generate One-Time Password (OTP) for account activation
+  const otp = generateOtp()
+  const tempPassword = req.body.password && req.body.password.length >= 8
+    ? req.body.password
+    : crypto.randomBytes(16).toString('hex') + 'A1!'
+
   const user = await User.create({
     ...req.body,
+    email: cleanEmail,
+    password: tempPassword,
     employeeId,
     joiningDate: req.body.joiningDate || new Date(),
     firm: req.user.firm, // scoped to creator's firm
@@ -249,7 +262,32 @@ export const createUser = asyncHandler(async (req, res) => {
     manager: req.body.manager || (req.user.role === ROLES.SUB_ADMIN ? req.user._id : undefined),
     isActive: true,
     createdBy: req.user._id,
+    resetOtpHash: hashToken(otp),
+    resetOtpExpires: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours for new user activation
+    mustSetPassword: true,
   })
+
+  // Prepare activation / setup link
+  const clientBaseUrl = req.headers.origin || env.clientUrl || (isProd ? 'https://real-estate-gamma-flame-64.vercel.app' : 'http://localhost:5173')
+  const setupLink = `${clientBaseUrl.replace(/\/+$/, '')}/set-password?email=${encodeURIComponent(user.email)}&otp=${otp}`
+
+  // Send the Welcome & One-Time Password email
+  let emailResult = { sent: false }
+  try {
+    emailResult = await sendNewUserInviteEmail({
+      to: user.email,
+      name: user.name,
+      role: user.role,
+      email: user.email,
+      employeeId: user.employeeId,
+      otp,
+      setupLink,
+      firmName: req.user.firm?.name,
+    })
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[user.controller] Failed to send new user invite email:', err.message)
+  }
 
   writeAudit({
     req,
@@ -257,9 +295,17 @@ export const createUser = asyncHandler(async (req, res) => {
     module: MODULES.USER,
     targetId: user._id,
     targetLabel: user.name,
-    description: `Created ${role} ${user.email}`,
+    description: `Created ${role} ${user.email} (Invite OTP sent: ${emailResult.sent ? 'Yes' : 'No'})`,
   })
-  return created(res, user, 'User created')
+
+  const responseData = {
+    ...user.toJSON(),
+    emailSent: Boolean(emailResult.sent),
+    // Provide devOtp and setupLink in development or when email fails so admin can see/copy it
+    ...((!isProd || !emailResult.sent) ? { devOtp: otp, setupLink } : {}),
+  }
+
+  return created(res, responseData, 'User created and one-time password email sent successfully')
 })
 
 // PATCH /api/users/:id

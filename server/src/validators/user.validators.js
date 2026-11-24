@@ -6,7 +6,7 @@ import { ROLES } from '../config/constants.js'
 export const createUserSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
   role: z.enum([ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE]),
   phone: z.string().optional(),
   branch: z.string().optional(),

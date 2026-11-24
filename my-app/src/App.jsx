@@ -9,6 +9,7 @@ import { ROLES } from './lib/constants.js'
 import LandingPage from './pages/landing/LandingPage.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
+import SetPasswordPage from './pages/auth/SetPasswordPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
 // Dashboards
@@ -158,6 +159,7 @@ export default function App() {
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/set-password" element={<SetPasswordPage />} />
 
             {/* Super Admin */}
             <Route path="/super-admin" element={shell(ROLES.SUPER_ADMIN)}>

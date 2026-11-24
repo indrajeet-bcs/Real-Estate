@@ -99,6 +99,7 @@ const userSchema = new Schema(
     // Password reset (OTP/email) — Section 2 "Forgot Password" flow.
     resetOtpHash: { type: String, select: false },
     resetOtpExpires: { type: Date, select: false },
+    mustSetPassword: { type: Boolean, default: false },
 
     // Refresh-token rotation: store hashes of currently valid refresh tokens.
     refreshTokens: { type: [String], select: false, default: [] },

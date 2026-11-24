@@ -130,6 +130,106 @@ export async function sendOtpEmail({ to, name, otp }) {
   return sendOtpEmailInternal({ to, subject, html, text })
 }
 
+/**
+ * Send a welcome email with a One-Time Password (OTP) and account setup link to a newly created user.
+ */
+export async function sendNewUserInviteEmail({ to, name, role, email, employeeId, otp, setupLink, firmName }) {
+  const displayName = name || 'there'
+  const companyTitle = firmName || 'Real Estate CRM'
+  const roleTitle = role ? role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Staff Member'
+  const subject = `Welcome to ${companyTitle} - Your One-Time Password & Account Setup`
+
+  const text = `Hello ${displayName},\n\n` +
+    `Your account has been created on ${companyTitle}.\n\n` +
+    `Here are your account details:\n` +
+    `- Name: ${displayName}\n` +
+    `- Email: ${email || to}\n` +
+    `- Role: ${roleTitle}\n` +
+    (employeeId ? `- Employee ID: ${employeeId}\n` : '') +
+    `\nYour One-Time Password (OTP) is: ${otp}\n\n` +
+    `Please set your own secure password by opening the following link:\n` +
+    `${setupLink}\n\n` +
+    `This one-time password and setup link will expire in 48 hours.\n\n` +
+    `Regards,\n${companyTitle} Team`
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
+          .container { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+          .header { background: #1e40af; padding: 28px 32px; text-align: center; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+          .header p { margin: 6px 0 0; color: #bfdbfe; font-size: 14px; }
+          .content { padding: 32px; }
+          .greeting { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #0f172a; }
+          .message { font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 24px; }
+          .details-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+          .details-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; }
+          .details-row:last-child { border-bottom: none; }
+          .details-label { color: #64748b; font-weight: 500; }
+          .details-value { color: #0f172a; font-weight: 600; }
+          .otp-section { text-align: center; background: #eff6ff; border: 2px dashed #93c5fd; border-radius: 12px; padding: 20px; margin: 24px 0; }
+          .otp-title { font-size: 12px; text-transform: uppercase; font-weight: 700; color: #1e40af; letter-spacing: 1px; margin-bottom: 8px; }
+          .otp-code { font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #1d4ed8; font-family: Courier, monospace; }
+          .otp-hint { font-size: 12px; color: #64748b; margin-top: 6px; }
+          .btn-container { text-align: center; margin: 28px 0; }
+          .btn { display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); }
+          .link-fallback { font-size: 12px; color: #64748b; word-break: break-all; margin-top: 20px; text-align: center; line-height: 1.5; }
+          .warning { font-size: 13px; color: #64748b; line-height: 1.5; margin-top: 24px; padding-top: 20px; border-top: 1px solid #f1f5f9; }
+          .footer { background: #f8fafc; padding: 16px 32px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Welcome to ${companyTitle}</h1>
+            <p>Your team account is ready</p>
+          </div>
+          <div class="content">
+            <div class="greeting">Hello ${displayName},</div>
+            <div class="message">
+              Your account has been created by your administrator. Use your One-Time Password (OTP) below to set your permanent password and activate your account.
+            </div>
+
+            <div class="details-card">
+              <div class="details-row"><span class="details-label">Registered Email</span><span class="details-value">${email || to}</span></div>
+              <div class="details-row"><span class="details-label">Role</span><span class="details-value">${roleTitle}</span></div>
+              ${employeeId ? `<div class="details-row"><span class="details-label">Employee ID</span><span class="details-value">${employeeId}</span></div>` : ''}
+            </div>
+
+            <div class="otp-section">
+              <div class="otp-title">Your One-Time Password (OTP)</div>
+              <div class="otp-code">${otp}</div>
+              <div class="otp-hint">Valid for 48 hours • Single use only</div>
+            </div>
+
+            <div class="btn-container">
+              <a href="${setupLink}" class="btn" target="_blank">Set Your Password &amp; Activate Account</a>
+            </div>
+
+            <div class="link-fallback">
+              Or copy and paste this link into your browser:<br>
+              <a href="${setupLink}" style="color: #2563eb;">${setupLink}</a>
+            </div>
+
+            <div class="warning">
+              <strong>Security Notice:</strong> Do not share this One-Time Password with anyone. Once you set your permanent password, this OTP will expire automatically.
+            </div>
+          </div>
+          <div class="footer">
+            &copy; ${new Date().getFullYear()} ${companyTitle}. All rights reserved.
+          </div>
+        </div>
+      </body>
+    </html>
+  `
+
+  return sendEmail({ to, subject, html, text })
+}
+
 async function sendOtpEmailInternal({ to, subject, html, text }) {
   return sendEmail({ to, subject, html, text })
 }
