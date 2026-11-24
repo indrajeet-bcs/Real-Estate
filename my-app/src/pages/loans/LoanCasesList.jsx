@@ -5,7 +5,7 @@ import { LOAN_STATUSES, FINANCIAL_INSTITUTIONS } from '../../lib/loanConstants.j
 import { loansApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
-import { exportRowsToCsv } from '../../lib/format.js'
+import { exportRowsToCsv, exportRowsToExcel } from '../../lib/format.js'
 
 export default function LoanCasesList() {
   const navigate = useNavigate()
@@ -36,11 +36,18 @@ export default function LoanCasesList() {
     { key: 'assignedExecutiveName', header: 'Executive', render: (r) => r.assignedExecutive?.name || r.assignedExecutiveName || '—' },
   ]
 
-  const handleExport = () => {
-    exportRowsToCsv('loan-cases.csv', rows.map((r) => ({
-      Case: r.caseCode, Customer: r.customerName, Booking: r.bookingLabel, Bank: r.bank,
-      Amount: r.loanAmount, Status: r.status, Executive: r.assignedExecutive?.name || r.assignedExecutiveName,
-    })))
+  const handleExport = (fmt = 'xlsx') => {
+    const data = rows.map((r) => ({
+      'Case ID': r.caseCode || '—',
+      'Customer': r.customerName || '—',
+      'Booking': r.bookingLabel || '—',
+      'Bank': r.bank || '—',
+      'Amount': r.loanAmount || 0,
+      'Status': r.status || '—',
+      'Executive': r.assignedExecutive?.name || r.assignedExecutiveName || '—',
+    }))
+    if (fmt === 'csv') exportRowsToCsv('loan-cases.csv', data)
+    else exportRowsToExcel('loan-cases.xlsx', data, 'Loan Cases')
   }
 
   return (
@@ -52,7 +59,13 @@ export default function LoanCasesList() {
           subtitle="Manage and track all customer loan applications."
           actions={
             <>
-              <ExportMenu items={[{ key: 'csv', label: 'Export to CSV', onClick: handleExport }]} disabled={rows.length === 0} />
+              <ExportMenu
+                items={[
+                  { key: 'xlsx', label: 'Export to Excel (.xlsx)', icon: 'table_view', onClick: () => handleExport('xlsx') },
+                  { key: 'csv', label: 'Export to CSV (.csv)', icon: 'description', onClick: () => handleExport('csv') },
+                ]}
+                disabled={rows.length === 0}
+              />
               <Button variant="primary" onClick={() => navigate('../create')}>+ New Loan Case</Button>
             </>
           }

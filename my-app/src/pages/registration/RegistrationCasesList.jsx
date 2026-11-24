@@ -6,7 +6,7 @@ import NewRegistrationModal from './NewRegistrationModal.jsx'
 import { registrationsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
-import { formatDate, exportRowsToCsv } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv, exportRowsToExcel } from '../../lib/format.js'
 
 export default function RegistrationCasesList() {
   const navigate = useNavigate()
@@ -36,10 +36,19 @@ export default function RegistrationCasesList() {
     { key: 'assignedEmployeeName', header: 'Employee', render: (r) => r.assignedEmployee?.name || r.assignedEmployeeName || '—' },
   ]
 
-  const handleExport = () => exportRowsToCsv('registration-cases.csv', rows.map((r) => ({
-    Case: r.caseCode, Customer: r.customerName, Booking: r.bookingLabel, Type: r.registrationType,
-    Appointment: r.appointmentDate, Status: r.status, Employee: r.assignedEmployee?.name || r.assignedEmployeeName,
-  })))
+  const handleExport = (fmt = 'xlsx') => {
+    const data = rows.map((r) => ({
+      'Case ID': r.caseCode || '—',
+      'Customer': r.customerName || '—',
+      'Booking': r.bookingLabel || '—',
+      'Type': r.registrationType || '—',
+      'Appointment Date': formatDate(r.appointmentDate),
+      'Status': r.status || '—',
+      'Assigned Employee': r.assignedEmployee?.name || r.assignedEmployeeName || '—',
+    }))
+    if (fmt === 'csv') exportRowsToCsv('registration-cases.csv', data)
+    else exportRowsToExcel('registration-cases.xlsx', data, 'Registration Cases')
+  }
 
   return (
     <div className="space-y-6">
@@ -50,7 +59,13 @@ export default function RegistrationCasesList() {
           subtitle="Manage and track all registration cases."
           actions={
             <>
-              <ExportMenu items={[{ key: 'csv', label: 'Export to CSV', onClick: handleExport }]} disabled={rows.length === 0} />
+              <ExportMenu
+                items={[
+                  { key: 'xlsx', label: 'Export to Excel (.xlsx)', icon: 'table_view', onClick: () => handleExport('xlsx') },
+                  { key: 'csv', label: 'Export to CSV (.csv)', icon: 'description', onClick: () => handleExport('csv') },
+                ]}
+                disabled={rows.length === 0}
+              />
               <Button variant="primary" onClick={() => setShowNewModal(true)}>+ New Registration Case</Button>
             </>
           }

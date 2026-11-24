@@ -5,8 +5,7 @@ import { registrationsApi } from '../../api/resources.js'
 import { useState } from 'react'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate } from '../../lib/format.js'
-import { exportRowsToCsv } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv, exportRowsToExcel } from '../../lib/format.js'
 
 export default function RegistrationReports() {
   const navigate = useNavigate()
@@ -15,7 +14,7 @@ export default function RegistrationReports() {
   const toast = useToast()
   const [downloading, setDownloading] = useState(false)
 
-  const handleDownloadMasterCsv = async () => {
+  const handleDownloadMasterReport = async (format = 'xlsx') => {
     setDownloading(true)
     try {
       const res = await registrationsApi.list({ limit: 1000 })
@@ -24,7 +23,7 @@ export default function RegistrationReports() {
         toast.info('No registration cases available')
         return
       }
-      exportRowsToCsv('registration-master-report.csv', list.map((c) => ({
+      const dataRows = list.map((c) => ({
         'Case Code': c.caseCode || '—',
         'Customer': c.customerName || '—',
         'Booking': c.bookingLabel || '—',
@@ -39,8 +38,15 @@ export default function RegistrationReports() {
         'Registration Date': formatDate(c.registrationDate),
         'Assigned Employee': c.assignedEmployee?.name || c.assignedEmployeeName || '—',
         'Remarks': c.remarks || '—'
-      })))
-      toast.success('Master registration report downloaded successfully (CSV)')
+      }))
+
+      if (format === 'csv') {
+        exportRowsToCsv('registration-master-report.csv', dataRows)
+        toast.success('Master registration report downloaded (CSV)')
+      } else {
+        exportRowsToExcel('registration-master-report.xlsx', dataRows, 'Registration Master')
+        toast.success('Master registration report downloaded (Excel .xlsx)')
+      }
     } catch {
       toast.error('Failed to download master report')
     } finally {
@@ -48,10 +54,21 @@ export default function RegistrationReports() {
     }
   }
 
-
-  const exportStatus = () => exportRowsToCsv('registration-status.csv', r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases })))
-  const exportType = () => exportRowsToCsv('registration-type.csv', r.byType.map((x) => ({ Type: x._id || '—', Cases: x.cases })))
-  const exportEmp = () => exportRowsToCsv('registration-employee.csv', r.byEmployee.map((x) => ({ Employee: x._id || '—', Cases: x.cases, Completed: x.completed || 0 })))
+  const exportStatus = (fmt = 'xlsx') => {
+    const data = r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases }))
+    if (fmt === 'csv') exportRowsToCsv('registration-status.csv', data)
+    else exportRowsToExcel('registration-status.xlsx', data, 'Status Summary')
+  }
+  const exportType = (fmt = 'xlsx') => {
+    const data = r.byType.map((x) => ({ Type: x._id || '—', Cases: x.cases }))
+    if (fmt === 'csv') exportRowsToCsv('registration-type.csv', data)
+    else exportRowsToExcel('registration-type.xlsx', data, 'By Type')
+  }
+  const exportEmp = (fmt = 'xlsx') => {
+    const data = r.byEmployee.map((x) => ({ Employee: x._id || '—', Cases: x.cases, Completed: x.completed || 0 }))
+    if (fmt === 'csv') exportRowsToCsv('registration-employee.csv', data)
+    else exportRowsToExcel('registration-employee.xlsx', data, 'Employee Performance')
+  }
 
   return (
     <div className="space-y-6">
@@ -61,10 +78,26 @@ export default function RegistrationReports() {
           title="Registration Reports"
           subtitle="Live insights across all registration cases."
           actions={
-            <Button variant="primary" onClick={handleDownloadMasterCsv} disabled={downloading}>
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              <span>{downloading ? 'Downloading CSV…' : 'Download CSV Report'}</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                onClick={() => handleDownloadMasterReport('xlsx')}
+                disabled={downloading}
+                className="inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[18px]">table_view</span>
+                <span>{downloading ? 'Downloading…' : 'Download Excel Report'}</span>
+              </Button>
+              <ExportMenu
+                label="Export"
+                disabled={downloading}
+                loading={downloading}
+                items={[
+                  { key: 'xlsx', label: 'Download Excel (.xlsx)', icon: 'table_view', onClick: () => handleDownloadMasterReport('xlsx') },
+                  { key: 'csv', label: 'Download CSV (.csv)', icon: 'description', onClick: () => handleDownloadMasterReport('csv') },
+                ]}
+              />
+            </div>
           }
         />
       </div>
@@ -94,7 +127,15 @@ function ReportCard({ title, subtitle, onExport, disabled, children }) {
         <p className="mb-4 text-sm text-slate-500">{subtitle}</p>
         <div className="mb-4">{children}</div>
       </div>
-      <ExportMenu items={[{ key: 'csv', label: 'Export to CSV', onClick: onExport }]} label="Download Report" align="left" disabled={disabled} />
+      <ExportMenu
+        items={[
+          { key: 'xlsx', label: 'Export to Excel (.xlsx)', icon: 'table_view', onClick: () => onExport('xlsx') },
+          { key: 'csv', label: 'Export to CSV (.csv)', icon: 'description', onClick: () => onExport('csv') },
+        ]}
+        label="Download Report"
+        align="left"
+        disabled={disabled}
+      />
     </Card>
   )
 }

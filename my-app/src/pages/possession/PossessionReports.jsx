@@ -5,8 +5,7 @@ import { possessionsApi } from '../../api/resources.js'
 import { useState } from 'react'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate } from '../../lib/format.js'
-import { exportRowsToCsv } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv, exportRowsToExcel } from '../../lib/format.js'
 
 export default function PossessionReports() {
   const navigate = useNavigate()
@@ -15,7 +14,7 @@ export default function PossessionReports() {
   const toast = useToast()
   const [downloading, setDownloading] = useState(false)
 
-  const handleDownloadMasterCsv = async () => {
+  const handleDownloadMasterReport = async (format = 'xlsx') => {
     setDownloading(true)
     try {
       const res = await possessionsApi.list({ limit: 1000 })
@@ -24,7 +23,7 @@ export default function PossessionReports() {
         toast.info('No possession cases available')
         return
       }
-      exportRowsToCsv('possession-master-report.csv', list.map((c) => ({
+      const dataRows = list.map((c) => ({
         'Case Code': c.caseCode || '—',
         'Customer': c.customerName || '—',
         'Booking': c.bookingLabel || '—',
@@ -35,8 +34,15 @@ export default function PossessionReports() {
         'Actual Possession Date': formatDate(c.actualPossessionDate),
         'Assigned Employee': c.assignedEmployee?.name || c.assignedEmployeeName || '—',
         'Remarks': c.remarks || '—'
-      })))
-      toast.success('Master possession report downloaded successfully (CSV)')
+      }))
+
+      if (format === 'csv') {
+        exportRowsToCsv('possession-master-report.csv', dataRows)
+        toast.success('Master possession report downloaded (CSV)')
+      } else {
+        exportRowsToExcel('possession-master-report.xlsx', dataRows, 'Possession Master')
+        toast.success('Master possession report downloaded (Excel .xlsx)')
+      }
     } catch {
       toast.error('Failed to download master possession report')
     } finally {
@@ -44,10 +50,21 @@ export default function PossessionReports() {
     }
   }
 
-
-  const exportStatus = () => exportRowsToCsv('possession-status.csv', r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases })))
-  const exportEmp = () => exportRowsToCsv('possession-employee.csv', r.byEmployee.map((x) => ({ Employee: x._id || '—', Cases: x.cases, Completed: x.completed || 0 })))
-  const exportProj = () => exportRowsToCsv('possession-project.csv', r.byProject.map((x) => ({ Project: x._id || '—', Cases: x.cases })))
+  const exportStatus = (fmt = 'xlsx') => {
+    const data = r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases }))
+    if (fmt === 'csv') exportRowsToCsv('possession-status.csv', data)
+    else exportRowsToExcel('possession-status.xlsx', data, 'Status Summary')
+  }
+  const exportEmp = (fmt = 'xlsx') => {
+    const data = r.byEmployee.map((x) => ({ Employee: x._id || '—', Cases: x.cases, Completed: x.completed || 0 }))
+    if (fmt === 'csv') exportRowsToCsv('possession-employee.csv', data)
+    else exportRowsToExcel('possession-employee.xlsx', data, 'Employee Performance')
+  }
+  const exportProj = (fmt = 'xlsx') => {
+    const data = r.byProject.map((x) => ({ Project: x._id || '—', Cases: x.cases }))
+    if (fmt === 'csv') exportRowsToCsv('possession-project.csv', data)
+    else exportRowsToExcel('possession-project.xlsx', data, 'Project Summary')
+  }
 
   return (
     <div className="space-y-6">
@@ -57,10 +74,26 @@ export default function PossessionReports() {
           title="Possession Reports"
           subtitle="Live insights across all handover cases."
           actions={
-            <Button variant="primary" onClick={handleDownloadMasterCsv} disabled={downloading}>
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              <span>{downloading ? 'Downloading CSV…' : 'Download CSV Report'}</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                onClick={() => handleDownloadMasterReport('xlsx')}
+                disabled={downloading}
+                className="inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[18px]">table_view</span>
+                <span>{downloading ? 'Downloading…' : 'Download Excel Report'}</span>
+              </Button>
+              <ExportMenu
+                label="Export"
+                disabled={downloading}
+                loading={downloading}
+                items={[
+                  { key: 'xlsx', label: 'Download Excel (.xlsx)', icon: 'table_view', onClick: () => handleDownloadMasterReport('xlsx') },
+                  { key: 'csv', label: 'Download CSV (.csv)', icon: 'description', onClick: () => handleDownloadMasterReport('csv') },
+                ]}
+              />
+            </div>
           }
         />
       </div>
@@ -90,7 +123,15 @@ function ReportCard({ title, subtitle, onExport, disabled, children }) {
         <p className="mb-4 text-sm text-slate-500">{subtitle}</p>
         <div className="mb-4">{children}</div>
       </div>
-      <ExportMenu items={[{ key: 'csv', label: 'Export to CSV', onClick: onExport }]} label="Download Report" align="left" disabled={disabled} />
+      <ExportMenu
+        items={[
+          { key: 'xlsx', label: 'Export to Excel (.xlsx)', icon: 'table_view', onClick: () => onExport('xlsx') },
+          { key: 'csv', label: 'Export to CSV (.csv)', icon: 'description', onClick: () => onExport('csv') },
+        ]}
+        label="Download Report"
+        align="left"
+        disabled={disabled}
+      />
     </Card>
   )
 }

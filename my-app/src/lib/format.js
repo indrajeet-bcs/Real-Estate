@@ -1,4 +1,5 @@
 // Presentation helpers shared across pages.
+import * as XLSX from 'xlsx'
 
 export function formatDate(value, withTime = false) {
   if (!value) return '—'
@@ -50,6 +51,62 @@ export function exportRowsToCsv(filename, rows) {
 
   // \uFEFF is the UTF-8 Byte Order Mark (BOM) so Microsoft Excel, LibreOffice, and Windows open the CSV correctly
   const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.style.display = 'none'
+  a.href = url
+  a.setAttribute('download', safeFilename)
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => {
+    try {
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (_) {}
+  }, 2000)
+}
+
+// Export rows (array of objects OR array of arrays) directly to an Excel (.xlsx) spreadsheet.
+// Opens directly in Microsoft Excel without encoding prompts or Word file format issues.
+export function exportRowsToExcel(filename, rows, sheetName = 'Sheet1') {
+  if (!rows || rows.length === 0) return
+  const safeFilename = filename.toLowerCase().endsWith('.xlsx') ? filename : `${filename}.xlsx`
+
+  let ws
+  if (Array.isArray(rows[0])) {
+    ws = XLSX.utils.aoa_to_sheet(rows)
+  } else {
+    ws = XLSX.utils.json_to_sheet(rows)
+  }
+
+  // Auto-fit column widths
+  const colWidths = []
+  if (Array.isArray(rows[0])) {
+    rows.forEach((r) => {
+      r.forEach((val, colIdx) => {
+        const len = String(val ?? '').length
+        colWidths[colIdx] = Math.max(colWidths[colIdx] || 10, len + 3)
+      })
+    })
+  } else {
+    const headers = Object.keys(rows[0])
+    headers.forEach((h, colIdx) => {
+      colWidths[colIdx] = h.length + 3
+    })
+    rows.forEach((r) => {
+      headers.forEach((h, colIdx) => {
+        const len = String(r[h] ?? '').length
+        colWidths[colIdx] = Math.max(colWidths[colIdx] || 10, len + 3)
+      })
+    })
+  }
+  ws['!cols'] = colWidths.map((w) => ({ wch: Math.min(Math.max(w, 10), 50) }))
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.style.display = 'none'

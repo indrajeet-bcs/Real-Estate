@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react'
 import NewRegistrationModal from './NewRegistrationModal.jsx'
 import { useNavigate } from 'react-router-dom'
-import { PageHeader, Card, StatCard, Button, Loader, ErrorState } from '../../components/ui.jsx'
+import { PageHeader, Card, StatCard, Button, ExportMenu, Loader, ErrorState } from '../../components/ui.jsx'
 import { registrationsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
-import { formatDate, exportRowsToCsv } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv, exportRowsToExcel } from '../../lib/format.js'
 import { useToast } from '../../context/ToastContext.jsx'
 
 export default function RegistrationDashboard() {
@@ -14,7 +14,7 @@ export default function RegistrationDashboard() {
   const toast = useToast()
   const [downloading, setDownloading] = useState(false)
 
-  const handleDownloadCsv = async () => {
+  const handleDownloadReport = async (format = 'xlsx') => {
     setDownloading(true)
     try {
       const res = await registrationsApi.list({ limit: 1000 })
@@ -23,7 +23,7 @@ export default function RegistrationDashboard() {
         toast.info('No registration cases available to download')
         return
       }
-      exportRowsToCsv('registration-cases-report.csv', list.map((c) => ({
+      const dataRows = list.map((c) => ({
         'Case Code': c.caseCode || '—',
         'Customer': c.customerName || '—',
         'Booking': c.bookingLabel || '—',
@@ -37,8 +37,14 @@ export default function RegistrationDashboard() {
         'Appointment Date': formatDate(c.appointmentDate),
         'Assigned Employee': c.assignedEmployee?.name || c.assignedEmployeeName || '—',
         'Remarks': c.remarks || '—'
-      })))
-      toast.success('Registration report downloaded successfully (CSV)')
+      }))
+      if (format === 'csv') {
+        exportRowsToCsv('registration-cases-report.csv', dataRows)
+        toast.success('Registration report downloaded (CSV)')
+      } else {
+        exportRowsToExcel('registration-cases-report.xlsx', dataRows, 'Registrations')
+        toast.success('Registration report downloaded (Excel .xlsx)')
+      }
     } catch {
       toast.error('Failed to download registration report')
     } finally {
@@ -55,14 +61,28 @@ export default function RegistrationDashboard() {
         title="Registration Management"
         subtitle="Track property registrations from document collection to possession readiness."
         actions={
-          <>
-            <Button variant="secondary" onClick={handleDownloadCsv} disabled={downloading}>
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              <span>{downloading ? 'Downloading CSV…' : 'Download CSV Report'}</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => handleDownloadReport('xlsx')}
+              disabled={downloading}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">table_view</span>
+              <span>{downloading ? 'Downloading…' : 'Download Excel Report'}</span>
             </Button>
+            <ExportMenu
+              label="Export"
+              disabled={downloading}
+              loading={downloading}
+              items={[
+                { key: 'xlsx', label: 'Download Excel (.xlsx)', icon: 'table_view', onClick: () => handleDownloadReport('xlsx') },
+                { key: 'csv', label: 'Download CSV (.csv)', icon: 'description', onClick: () => handleDownloadReport('csv') },
+              ]}
+            />
             <Button variant="secondary" onClick={() => navigate('reports')}>View Reports</Button>
             <Button variant="primary" onClick={() => setShowNewModal(true)}>+ New Registration Case</Button>
-          </>
+          </div>
         }
       />
 

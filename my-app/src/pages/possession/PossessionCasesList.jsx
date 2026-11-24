@@ -5,7 +5,7 @@ import { POSSESSION_STATUSES } from '../../lib/possessionConstants.js'
 import { possessionsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useDebounce } from '../../hooks/useDebounce.js'
-import { formatDate, exportRowsToCsv } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv, exportRowsToExcel } from '../../lib/format.js'
 
 export default function PossessionCasesList() {
   const navigate = useNavigate()
@@ -29,10 +29,20 @@ export default function PossessionCasesList() {
     { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> },
   ]
 
-  const handleExport = () => exportRowsToCsv('possession-cases.csv', rows.map((r) => ({
-    Case: r.caseCode, Customer: r.customerName, Booking: r.bookingLabel, Project: r.project, Unit: r.unitNumber,
-    Scheduled: r.scheduledDate, Status: r.status, Employee: r.assignedEmployee?.name || r.assignedEmployeeName,
-  })))
+  const handleExport = (fmt = 'xlsx') => {
+    const data = rows.map((r) => ({
+      'Case ID': r.caseCode || '—',
+      'Customer': r.customerName || '—',
+      'Booking': r.bookingLabel || '—',
+      'Project': r.project || '—',
+      'Unit': r.unitNumber || '—',
+      'Scheduled Date': formatDate(r.scheduledDate),
+      'Status': r.status || '—',
+      'Employee': r.assignedEmployee?.name || r.assignedEmployeeName || '—',
+    }))
+    if (fmt === 'csv') exportRowsToCsv('possession-cases.csv', data)
+    else exportRowsToExcel('possession-cases.xlsx', data, 'Possession Cases')
+  }
 
   return (
     <div className="space-y-6">
@@ -43,7 +53,13 @@ export default function PossessionCasesList() {
           subtitle="Manage and track all handover cases."
           actions={
             <>
-              <ExportMenu items={[{ key: 'csv', label: 'Export to CSV', onClick: handleExport }]} disabled={rows.length === 0} />
+              <ExportMenu
+                items={[
+                  { key: 'xlsx', label: 'Export to Excel (.xlsx)', icon: 'table_view', onClick: () => handleExport('xlsx') },
+                  { key: 'csv', label: 'Export to CSV (.csv)', icon: 'description', onClick: () => handleExport('csv') },
+                ]}
+                disabled={rows.length === 0}
+              />
               <Button variant="primary" onClick={() => navigate('../create', { relative: 'path' })}>+ New Possession Case</Button>
             </>
           }

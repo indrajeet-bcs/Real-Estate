@@ -5,8 +5,7 @@ import { loansApi } from '../../api/resources.js'
 import { useState } from 'react'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate } from '../../lib/format.js'
-import { exportRowsToCsv } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv, exportRowsToExcel } from '../../lib/format.js'
 
 const inrL = (n) => `₹${((Number(n) || 0) / 100000).toFixed(2)}L`
 
@@ -17,7 +16,7 @@ export default function LoanReports() {
   const toast = useToast()
   const [downloading, setDownloading] = useState(false)
 
-  const handleDownloadMasterCsv = async () => {
+  const handleDownloadMasterReport = async (format = 'xlsx') => {
     setDownloading(true)
     try {
       const res = await loansApi.list({ limit: 1000 })
@@ -26,12 +25,12 @@ export default function LoanReports() {
         toast.info('No loan cases available')
         return
       }
-      exportRowsToCsv('loan-master-report.csv', list.map((c) => ({
+      const dataRows = list.map((c) => ({
         'Case Code': c.caseCode || '—',
         'Customer': c.customerName || '—',
         'Booking': c.bookingLabel || '—',
-        'Bank': c.bankName || '—',
-        'Loan Amount': c.loanAmountRequested || 0,
+        'Bank': c.bankName || c.bank || '—',
+        'Loan Amount': c.loanAmountRequested || c.loanAmount || 0,
         'Sanctioned Amount': c.loanAmountSanctioned || 0,
         'Disbursed Amount': c.disbursedAmount || 0,
         'Status': c.status || '—',
@@ -39,8 +38,15 @@ export default function LoanReports() {
         'Sanction Date': formatDate(c.sanctionDate),
         'Disbursement Date': formatDate(c.disbursementDate),
         'Remarks': c.remarks || '—'
-      })))
-      toast.success('Master loan report downloaded successfully (CSV)')
+      }))
+
+      if (format === 'csv') {
+        exportRowsToCsv('loan-master-report.csv', dataRows)
+        toast.success('Master loan report downloaded (CSV)')
+      } else {
+        exportRowsToExcel('loan-master-report.xlsx', dataRows, 'Loan Master')
+        toast.success('Master loan report downloaded (Excel .xlsx)')
+      }
     } catch {
       toast.error('Failed to download master loan report')
     } finally {
@@ -48,10 +54,21 @@ export default function LoanReports() {
     }
   }
 
-
-  const exportBank = () => exportRowsToCsv('loan-bank-summary.csv', r.byBank.map((x) => ({ Bank: x._id || '—', Cases: x.cases, Sanctioned: x.sanctioned || 0, Disbursed: x.disbursed || 0 })))
-  const exportStatus = () => exportRowsToCsv('loan-status-summary.csv', r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases })))
-  const exportExec = () => exportRowsToCsv('loan-executive-performance.csv', r.byExecutive.map((x) => ({ Executive: x._id || '—', Cases: x.cases, Disbursed: x.disbursed || 0 })))
+  const exportBank = (fmt = 'xlsx') => {
+    const data = r.byBank.map((x) => ({ Bank: x._id || '—', Cases: x.cases, Sanctioned: x.sanctioned || 0, Disbursed: x.disbursed || 0 }))
+    if (fmt === 'csv') exportRowsToCsv('loan-bank-summary.csv', data)
+    else exportRowsToExcel('loan-bank-summary.xlsx', data, 'Bank Summary')
+  }
+  const exportStatus = (fmt = 'xlsx') => {
+    const data = r.byStatus.map((x) => ({ Status: x._id || '—', Cases: x.cases }))
+    if (fmt === 'csv') exportRowsToCsv('loan-status-summary.csv', data)
+    else exportRowsToExcel('loan-status-summary.xlsx', data, 'Status Summary')
+  }
+  const exportExec = (fmt = 'xlsx') => {
+    const data = r.byExecutive.map((x) => ({ Executive: x._id || '—', Cases: x.cases, Disbursed: x.disbursed || 0 }))
+    if (fmt === 'csv') exportRowsToCsv('loan-executive-performance.csv', data)
+    else exportRowsToExcel('loan-executive-performance.xlsx', data, 'Executive Performance')
+  }
 
   return (
     <div className="space-y-6">
@@ -61,10 +78,26 @@ export default function LoanReports() {
           title="Loan Reports"
           subtitle="Live insights across all loan processes."
           actions={
-            <Button variant="primary" onClick={handleDownloadMasterCsv} disabled={downloading}>
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              <span>{downloading ? 'Downloading CSV…' : 'Download CSV Report'}</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                onClick={() => handleDownloadMasterReport('xlsx')}
+                disabled={downloading}
+                className="inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[18px]">table_view</span>
+                <span>{downloading ? 'Downloading…' : 'Download Excel Report'}</span>
+              </Button>
+              <ExportMenu
+                label="Export"
+                disabled={downloading}
+                loading={downloading}
+                items={[
+                  { key: 'xlsx', label: 'Download Excel (.xlsx)', icon: 'table_view', onClick: () => handleDownloadMasterReport('xlsx') },
+                  { key: 'csv', label: 'Download CSV (.csv)', icon: 'description', onClick: () => handleDownloadMasterReport('csv') },
+                ]}
+              />
+            </div>
           }
         />
       </div>
@@ -94,7 +127,15 @@ function ReportCard({ title, subtitle, onExport, disabled, children }) {
         <p className="mb-4 text-sm text-slate-500">{subtitle}</p>
         <div className="mb-4">{children}</div>
       </div>
-      <ExportMenu items={[{ key: 'csv', label: 'Export to CSV', onClick: onExport }]} label="Download Report" align="left" disabled={disabled} />
+      <ExportMenu
+        items={[
+          { key: 'xlsx', label: 'Export to Excel (.xlsx)', icon: 'table_view', onClick: () => onExport('xlsx') },
+          { key: 'csv', label: 'Export to CSV (.csv)', icon: 'description', onClick: () => onExport('csv') },
+        ]}
+        label="Download Report"
+        align="left"
+        disabled={disabled}
+      />
     </Card>
   )
 }
