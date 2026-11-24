@@ -83,7 +83,13 @@ export default function CustomerSupportPage() {
           setSearch={(v) => { setSearch(v); setPage(1) }}
           setStatus={(v) => { setStatus(v?.target ? v.target.value : v); setPage(1) }}
           setPriority={(v) => { setPriority(v?.target ? v.target.value : v); setPage(1) }}
-          reset={() => { setSearch(''); setStatus(''); setPriority(''); setPage(1) }}
+          reset={() => {
+            setSearch('')
+            setStatus('')
+            setPriority('')
+            setPage(1)
+            refetch()
+          }}
           onPage={setPage} onPageSize={(n) => { setLimit(n); setPage(1) }}
         />
       )}
@@ -332,8 +338,7 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
             <Button
               variant="secondary"
               onClick={reset}
-              className="w-full h-[42px] justify-center rounded-xl border-slate-300 hover:border-blue-400 hover:bg-slate-50 transition-all shadow-xs"
-              disabled={!hasActiveFilters}
+              className="w-full h-[42px] justify-center rounded-xl border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 hover:text-blue-700 transition-all shadow-xs cursor-pointer font-medium"
             >
               <span className="material-symbols-outlined text-[18px]">restart_alt</span>
               Reset Filters
