@@ -16,8 +16,12 @@ import { env, isProd } from '../config/env.js'
 import { sendOtpEmail } from '../utils/email.js'
 
 const REFRESH_COOKIE = 'refreshToken'
+const LAST_ACTIVITY_COOKIE = 'lastActivity'
 
 const isSecure = isProd || process.env.RENDER === 'true'
+
+// Idle timeout in milliseconds (default 30 min, driven by SESSION_IDLE_TIMEOUT_MIN env var)
+const IDLE_TIMEOUT_MS = (parseInt(process.env.SESSION_IDLE_TIMEOUT_MIN, 10) || 30) * 60 * 1000
 
 function refreshCookieOptions() {
   return {
@@ -32,10 +36,25 @@ function refreshCookieOptions() {
   }
 }
 
+function lastActivityCookieOptions() {
+  return {
+    httpOnly: false,          // Readable by JS so the client can also enforce idle timeout
+    secure: isSecure,
+    sameSite: isSecure ? 'none' : 'lax',
+    maxAge: IDLE_TIMEOUT_MS,  // Automatically expires after the idle window
+    path: '/',
+  }
+}
+
 function clearRefreshCookie(res) {
   res.clearCookie(REFRESH_COOKIE, {
     path: '/api/auth',
     httpOnly: true,
+    secure: isSecure,
+    sameSite: isSecure ? 'none' : 'lax',
+  })
+  res.clearCookie(LAST_ACTIVITY_COOKIE, {
+    path: '/',
     secure: isSecure,
     sameSite: isSecure ? 'none' : 'lax',
   })
@@ -45,6 +64,8 @@ function clearRefreshCookie(res) {
 // cookie). The refresh token's hash is stored so it can be rotated/revoked.
 // An atomic $push (keeping the newest 5) avoids optimistic-concurrency
 // VersionErrors when the same user logs in from two requests at once.
+// Also sets a lastActivity cookie (non-httpOnly) so the server can enforce
+// the idle timeout on every refresh call.
 async function issueTokens(res, user, set = {}) {
   const accessToken = signAccessToken(user)
   const refreshToken = signRefreshToken(user)
@@ -53,6 +74,8 @@ async function issueTokens(res, user, set = {}) {
   if (Object.keys(set).length) update.$set = set
   await User.updateOne({ _id: user._id }, update)
   res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions())
+  // Update the sliding-window last-activity timestamp
+  res.cookie(LAST_ACTIVITY_COOKIE, Date.now().toString(), lastActivityCookieOptions())
   return accessToken
 }
 
@@ -85,6 +108,20 @@ export const login = asyncHandler(async (req, res) => {
 export const refresh = asyncHandler(async (req, res) => {
   const token = req.cookies?.[REFRESH_COOKIE]
   if (!token) throw ApiError.unauthorized('No refresh token')
+
+  // ── Idle-session enforcement ────────────────────────────────────────────
+  // The lastActivity cookie is updated on every successful token issue.
+  // If it is missing OR older than IDLE_TIMEOUT_MS we treat the session as
+  // expired, clear all cookies, and return 401 so the client redirects to login.
+  const lastActivity = req.cookies?.[LAST_ACTIVITY_COOKIE]
+  if (!lastActivity || Date.now() - parseInt(lastActivity, 10) > IDLE_TIMEOUT_MS) {
+    // Clear cookies but we can't call clearRefreshCookie without verifying the
+    // token first, so clear both cookies directly here.
+    res.clearCookie(REFRESH_COOKIE, { path: '/api/auth', httpOnly: true, secure: isSecure, sameSite: isSecure ? 'none' : 'lax' })
+    res.clearCookie(LAST_ACTIVITY_COOKIE, { path: '/', secure: isSecure, sameSite: isSecure ? 'none' : 'lax' })
+    throw ApiError.unauthorized('Session expired due to inactivity. Please log in again.')
+  }
+  // ───────────────────────────────────────────────────────────────────────
 
   let payload
   try {
