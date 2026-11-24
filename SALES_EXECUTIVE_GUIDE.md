@@ -1,3 +1,4 @@
+
 # Sales Executive Module — Developer Onboarding & Architecture Guide
 
 Welcome! This document provides a complete, clear, and easy-to-understand explanation of the **Sales Executive (Field/Desk Agent)** flow, file structure, and technical workflows in this Real Estate CRM.

@@ -38,13 +38,58 @@ const thisMonth = (v) => {
 const timeOf = (v) =>
   v ? new Date(v).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'
 
+const cleanLocText = (g) => {
+  if (!g) return '—'
+  let addr = g.address || ''
+  if (/[\u0900-\u097F]/.test(addr)) {
+    addr = addr.replace(/[\u0900-\u097F]+/g, '').replace(/^[,\s-]+|[,\s-]+$/g, '').replace(/(\s*,\s*)+/g, ', ').trim()
+  }
+  if (addr) return addr
+  if (g.lat != null && g.lng != null) return `${Number(g.lat).toFixed(4)}, ${Number(g.lng).toFixed(4)}`
+  return '—'
+}
+
+async function getReverseAddress(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`, {
+      headers: { 'Accept-Language': 'en' },
+      signal: AbortSignal.timeout(2500)
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const addr = data.address || {}
+      const parts = [
+        addr.suburb || addr.neighbourhood || addr.road,
+        addr.city || addr.town || addr.county,
+        addr.state
+      ].filter(Boolean)
+      let text = parts.length > 0 ? parts.join(', ') : (data.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : '')
+      text = text.replace(/[\u0900-\u097F]+/g, '').replace(/^[,\s-]+|[,\s-]+$/g, '').replace(/(\s*,\s*)+/g, ', ').trim()
+      if (text) return text
+    }
+  } catch {
+    // Fall back to coordinates
+  }
+  return `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`
+}
+
 function getLocation() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(undefined)
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      async (pos) => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        const address = await getReverseAddress(lat, lng)
+        resolve({
+          lat,
+          lng,
+          accuracy: pos.coords.accuracy,
+          address
+        })
+      },
       () => resolve(undefined),
-      { timeout: 5000 }
+      { enableHighAccuracy: true, timeout: 8000 }
     )
   })
 }
@@ -1092,6 +1137,53 @@ function AttendanceCard({ q }) {
           <div className="mt-0.5 text-[11px] font-medium text-slate-500 uppercase tracking-wide">Working Hours</div>
         </div>
       </div>
+
+      {/* Captured Check-In & Check-Out GPS Locations */}
+      {(checkedIn || today?.checkInLocation || today?.checkOutLocation) && (
+        <div className="mt-2.5 rounded-lg bg-slate-50/80 p-2.5 text-xs text-slate-600 border border-slate-200 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1 text-slate-600 font-semibold shrink-0">
+              <span className="material-symbols-outlined text-[15px] text-emerald-600">location_on</span>
+              Check-In Loc:
+            </span>
+            <span className="truncate font-medium text-slate-800 text-right" title={today?.checkInLocation ? cleanLocText(today.checkInLocation) : 'Not recorded'}>
+              {today?.checkInLocation ? cleanLocText(today.checkInLocation) : (checkedIn ? 'Captured' : '—')}
+            </span>
+            {today?.checkInLocation?.lat != null && (
+              <a
+                href={`https://www.google.com/maps?q=${today.checkInLocation.lat},${today.checkInLocation.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 shrink-0"
+                title="Open in Maps"
+              >
+                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+              </a>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-t border-slate-200/60 pt-1.5">
+            <span className="flex items-center gap-1 text-slate-600 font-semibold shrink-0">
+              <span className="material-symbols-outlined text-[15px] text-blue-600">location_on</span>
+              Check-Out Loc:
+            </span>
+            <span className="truncate font-medium text-slate-800 text-right" title={today?.checkOutLocation ? cleanLocText(today.checkOutLocation) : ''}>
+              {today?.checkOutLocation ? cleanLocText(today.checkOutLocation) : (checkedOut ? 'Captured' : (checkedIn ? <span className="text-amber-600 italic font-medium">Pending Check-Out</span> : '—'))}
+            </span>
+            {today?.checkOutLocation?.lat != null && (
+              <a
+                href={`https://www.google.com/maps?q=${today.checkOutLocation.lat},${today.checkOutLocation.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 shrink-0"
+                title="Open in Maps"
+              >
+                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-3.5 flex gap-2.5">
         <Button

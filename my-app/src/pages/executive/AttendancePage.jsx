@@ -5,14 +5,59 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate } from '../../lib/format.js'
 import { PageHeader, Card, Button, Input, Textarea, Modal, Table, Pagination, StatusBadge, Loader } from '../../components/ui.jsx'
 
+const locText = (g) => {
+  if (!g) return '—'
+  let addr = g.address || ''
+  if (/[\u0900-\u097F]/.test(addr)) {
+    addr = addr.replace(/[\u0900-\u097F]+/g, '').replace(/^[,\s-]+|[,\s-]+$/g, '').replace(/(\s*,\s*)+/g, ', ').trim()
+  }
+  if (addr) return addr
+  if (g.lat != null && g.lng != null) return `${Number(g.lat).toFixed(4)}, ${Number(g.lng).toFixed(4)}`
+  return '—'
+}
+
+async function getReverseAddress(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`, {
+      headers: { 'Accept-Language': 'en' },
+      signal: AbortSignal.timeout(2500)
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const addr = data.address || {}
+      const parts = [
+        addr.suburb || addr.neighbourhood || addr.road,
+        addr.city || addr.town || addr.county,
+        addr.state
+      ].filter(Boolean)
+      let text = parts.length > 0 ? parts.join(', ') : (data.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : '')
+      text = text.replace(/[\u0900-\u097F]+/g, '').replace(/^[,\s-]+|[,\s-]+$/g, '').replace(/(\s*,\s*)+/g, ', ').trim()
+      if (text) return text
+    }
+  } catch {
+    // Fall back to coordinates
+  }
+  return `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`
+}
+
 // Reads the browser's geolocation (best-effort) for the check-in/out GPS stamp.
 function getLocation() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(undefined)
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      async (pos) => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        const address = await getReverseAddress(lat, lng)
+        resolve({
+          lat,
+          lng,
+          accuracy: pos.coords.accuracy,
+          address
+        })
+      },
       () => resolve(undefined),
-      { timeout: 5000 }
+      { enableHighAccuracy: true, timeout: 8000 }
     )
   })
 }
@@ -44,8 +89,34 @@ export default function AttendancePage() {
 
   const columns = [
     { key: 'date', header: 'Date' },
-    { key: 'checkInAt', header: 'Check-in', render: (r) => formatDate(r.checkInAt, true) },
-    { key: 'checkOutAt', header: 'Check-out', render: (r) => (r.checkOutAt ? formatDate(r.checkOutAt, true) : '—') },
+    { key: 'checkInAt', header: 'Check-In Time', render: (r) => formatDate(r.checkInAt, true) },
+    { key: 'inLoc', header: 'Check-In Location', render: (r) => (
+      r.checkInLocation ? (
+        <div className="flex items-center gap-1.5 text-xs text-slate-700">
+          <span className="material-symbols-outlined text-[15px] text-emerald-600 shrink-0">location_on</span>
+          <span className="truncate max-w-[150px]" title={locText(r.checkInLocation)}>{locText(r.checkInLocation)}</span>
+          {r.checkInLocation.lat != null && (
+            <a href={`https://www.google.com/maps?q=${r.checkInLocation.lat},${r.checkInLocation.lng}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 shrink-0" title="Open Map">
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+            </a>
+          )}
+        </div>
+      ) : <span className="text-slate-400 text-xs">—</span>
+    ) },
+    { key: 'checkOutAt', header: 'Check-Out Time', render: (r) => (r.checkOutAt ? formatDate(r.checkOutAt, true) : '—') },
+    { key: 'outLoc', header: 'Check-Out Location', render: (r) => (
+      r.checkOutLocation ? (
+        <div className="flex items-center gap-1.5 text-xs text-slate-700">
+          <span className="material-symbols-outlined text-[15px] text-blue-600 shrink-0">location_on</span>
+          <span className="truncate max-w-[150px]" title={locText(r.checkOutLocation)}>{locText(r.checkOutLocation)}</span>
+          {r.checkOutLocation.lat != null && (
+            <a href={`https://www.google.com/maps?q=${r.checkOutLocation.lat},${r.checkOutLocation.lng}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 shrink-0" title="Open Map">
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+            </a>
+          )}
+        </div>
+      ) : <span className="text-slate-400 text-xs">—</span>
+    ) },
     { key: 'workedMinutes', header: 'Worked', render: (r) => (r.workedMinutes ? `${Math.floor(r.workedMinutes / 60)}h ${r.workedMinutes % 60}m` : '—') },
     { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'actions', header: '', render: (r) => <Button size="sm" variant="ghost" onClick={() => setCorrectFor(r.date)}>Request Correction</Button> },

@@ -5,7 +5,16 @@ import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { PageHeader, StatCard, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState } from '../../components/ui.jsx'
 
 function hours(min) { return min ? `${Math.floor(min / 60)}h ${min % 60}m` : '—' }
-function locText(loc) { return loc?.address || (loc?.lat != null ? `${loc.lat.toFixed(4)}, ${loc.lng?.toFixed(4)}` : '—') }
+function locText(loc) {
+  if (!loc) return '—'
+  let addr = loc.address || ''
+  if (/[\u0900-\u097F]/.test(addr)) {
+    addr = addr.replace(/[\u0900-\u097F]+/g, '').replace(/^[,\s-]+|[,\s-]+$/g, '').replace(/(\s*,\s*)+/g, ', ').trim()
+  }
+  if (addr) return addr
+  if (loc.lat != null && loc.lng != null) return `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
+  return '—'
+}
 
 function csv(name, rows) {
   exportRowsToCsv(name, rows)
@@ -48,9 +57,34 @@ export default function AttendanceReviewPage() {
     ) },
     { key: 'date', header: 'Date' },
     { key: 'in', header: 'Check-In', render: (r) => r.checkInAt ? formatDate(r.checkInAt, true) : '—' },
+    { key: 'inLoc', header: 'Check-In Location', render: (r) => (
+      r.checkInLocation ? (
+        <div className="flex items-center gap-1 text-xs text-slate-700">
+          <span className="material-symbols-outlined text-[15px] text-emerald-600 shrink-0">location_on</span>
+          <span className="truncate max-w-[140px]" title={locText(r.checkInLocation)}>{locText(r.checkInLocation)}</span>
+          {r.checkInLocation.lat != null && (
+            <a href={`https://www.google.com/maps?q=${r.checkInLocation.lat},${r.checkInLocation.lng}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 shrink-0">
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+            </a>
+          )}
+        </div>
+      ) : <span className="text-slate-400 text-xs">—</span>
+    ) },
     { key: 'out', header: 'Check-Out', render: (r) => r.checkOutAt ? formatDate(r.checkOutAt, true) : '—' },
+    { key: 'outLoc', header: 'Check-Out Location', render: (r) => (
+      r.checkOutLocation ? (
+        <div className="flex items-center gap-1 text-xs text-slate-700">
+          <span className="material-symbols-outlined text-[15px] text-blue-600 shrink-0">location_on</span>
+          <span className="truncate max-w-[140px]" title={locText(r.checkOutLocation)}>{locText(r.checkOutLocation)}</span>
+          {r.checkOutLocation.lat != null && (
+            <a href={`https://www.google.com/maps?q=${r.checkOutLocation.lat},${r.checkOutLocation.lng}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 shrink-0">
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+            </a>
+          )}
+        </div>
+      ) : <span className="text-slate-400 text-xs">—</span>
+    ) },
     { key: 'hrs', header: 'Working Hours', render: (r) => hours(r.workedMinutes) },
-    { key: 'inLoc', header: 'Check-In Location', render: (r) => <span className="text-xs text-slate-600">{locText(r.checkInLocation)}</span> },
     { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'actions', header: '', render: (r) => <Button size="sm" variant="ghost" onClick={() => setDetail(r)}>View</Button> },
   ]

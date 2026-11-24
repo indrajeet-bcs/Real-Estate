@@ -24,6 +24,30 @@ function dayKey(date) {
   return `${y}-${m}-${d}`
 }
 
+async function resolveLocationAddress(loc) {
+  if (!loc || loc.lat == null || loc.lng == null) return loc
+  let addr = loc.address
+  if (!addr || /^\s*[\d.-]+,\s*[\d.-]+\s*$/.test(addr) || /[\u0900-\u097F]/.test(addr)) {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${loc.lat}&lon=${loc.lng}&accept-language=en`, {
+        headers: { 'Accept-Language': 'en', 'User-Agent': 'RealEstateApp/1.0' },
+        signal: AbortSignal.timeout(3000)
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const a = data.address || {}
+        const parts = [a.suburb || a.neighbourhood || a.road, a.city || a.town || a.county, a.state].filter(Boolean)
+        let text = parts.length > 0 ? parts.join(', ') : (data.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : '')
+        text = text.replace(/[\u0900-\u097F]+/g, '').replace(/^[,\s-]+|[,\s-]+$/g, '').replace(/(\s*,\s*)+/g, ', ').trim()
+        if (text) addr = text
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  return { ...loc, address: addr || `${Number(loc.lat).toFixed(4)}, ${Number(loc.lng).toFixed(4)}` }
+}
+
 // POST /api/attendance/check-in — day start with optional GPS (§9).
 export const checkIn = asyncHandler(async (req, res) => {
   const now = new Date()
@@ -36,13 +60,15 @@ export const checkIn = asyncHandler(async (req, res) => {
   lateCutoff.setHours(ON_TIME_HOUR, LATE_GRACE_MIN, 0, 0)
   const status = now > lateCutoff ? ATTENDANCE_STATUS.LATE : ATTENDANCE_STATUS.ON_TIME
 
+  const checkInLocation = await resolveLocationAddress(req.body.location)
+
   const record = await Attendance.findOneAndUpdate(
     { user: req.user._id, date },
     {
       $set: {
         firm: req.user.firm,
         checkInAt: now,
-        checkInLocation: req.body.location,
+        checkInLocation,
         checkInRemarks: req.body.remarks,
         ...(req.body.photo ? { checkInPhoto: req.body.photo } : {}),
         status,
@@ -64,7 +90,7 @@ export const checkOut = asyncHandler(async (req, res) => {
   if (record.checkOutAt) throw ApiError.conflict('Already checked out today')
 
   record.checkOutAt = now
-  record.checkOutLocation = req.body.location
+  record.checkOutLocation = await resolveLocationAddress(req.body.location)
   record.checkOutRemarks = req.body.remarks
   record.workedMinutes = Math.round((now - record.checkInAt) / 60000)
 

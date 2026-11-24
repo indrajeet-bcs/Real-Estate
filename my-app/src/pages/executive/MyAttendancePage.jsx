@@ -26,13 +26,56 @@ const StatusPill = ({ s }) => {
 const dayKey = (d) => { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${dd}` }
 const hm = (min) => (min ? `${Math.floor(min / 60)}h ${min % 60}m` : '—')
 const time = (d) => (d ? new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—')
-const locText = (g) => (g ? (g.address || (g.lat != null ? `${Number(g.lat).toFixed(4)}, ${Number(g.lng).toFixed(4)}` : '—')) : '—')
+const locText = (g) => {
+  if (!g) return '—'
+  let addr = g.address || ''
+  if (/[\u0900-\u097F]/.test(addr)) {
+    addr = addr.replace(/[\u0900-\u097F]+/g, '').replace(/^[,\s-]+|[,\s-]+$/g, '').replace(/(\s*,\s*)+/g, ', ').trim()
+  }
+  if (addr) return addr
+  if (g.lat != null && g.lng != null) return `${Number(g.lat).toFixed(4)}, ${Number(g.lng).toFixed(4)}`
+  return '—'
+}
+
+async function getReverseAddress(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`, {
+      headers: { 'Accept-Language': 'en' },
+      signal: AbortSignal.timeout(2500)
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const addr = data.address || {}
+      const parts = [
+        addr.suburb || addr.neighbourhood || addr.road,
+        addr.city || addr.town || addr.county,
+        addr.state
+      ].filter(Boolean)
+      let text = parts.length > 0 ? parts.join(', ') : (data.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : '')
+      text = text.replace(/[\u0900-\u097F]+/g, '').replace(/^[,\s-]+|[,\s-]+$/g, '').replace(/(\s*,\s*)+/g, ', ').trim()
+      if (text) return text
+    }
+  } catch {
+    // Fall back to coordinates
+  }
+  return `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`
+}
 
 function getLocation() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(undefined)
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, address: `${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}` }),
+      async (p) => {
+        const lat = p.coords.latitude
+        const lng = p.coords.longitude
+        const address = await getReverseAddress(lat, lng)
+        resolve({
+          lat,
+          lng,
+          accuracy: p.coords.accuracy,
+          address
+        })
+      },
       () => resolve(undefined),
       { enableHighAccuracy: true, timeout: 8000 }
     )
@@ -78,11 +121,36 @@ export default function MyAttendancePage() {
 
   const columns = [
     { key: 'date', header: 'Date', render: (r) => formatDate(r.date) },
-    { key: 'in', header: 'Check-In', render: (r) => time(r.checkInAt) },
-    { key: 'out', header: 'Check-Out', render: (r) => time(r.checkOutAt) },
+    { key: 'in', header: 'Check-In Time', render: (r) => time(r.checkInAt) },
+    { key: 'inLoc', header: 'Check-In Location', render: (r) => (
+      r.checkInLocation ? (
+        <div className="flex items-center gap-1.5 text-xs text-slate-700">
+          <span className="material-symbols-outlined text-[15px] text-emerald-600 shrink-0">location_on</span>
+          <span className="truncate max-w-[150px]" title={locText(r.checkInLocation)}>{locText(r.checkInLocation)}</span>
+          {r.checkInLocation.lat != null && (
+            <a href={`https://www.google.com/maps?q=${r.checkInLocation.lat},${r.checkInLocation.lng}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 hover:text-blue-800 shrink-0" title="Open in Google Maps">
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+            </a>
+          )}
+        </div>
+      ) : <span className="text-slate-400 text-xs">—</span>
+    ) },
+    { key: 'out', header: 'Check-Out Time', render: (r) => time(r.checkOutAt) },
+    { key: 'outLoc', header: 'Check-Out Location', render: (r) => (
+      r.checkOutLocation ? (
+        <div className="flex items-center gap-1.5 text-xs text-slate-700">
+          <span className="material-symbols-outlined text-[15px] text-blue-600 shrink-0">location_on</span>
+          <span className="truncate max-w-[150px]" title={locText(r.checkOutLocation)}>{locText(r.checkOutLocation)}</span>
+          {r.checkOutLocation.lat != null && (
+            <a href={`https://www.google.com/maps?q=${r.checkOutLocation.lat},${r.checkOutLocation.lng}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 hover:text-blue-800 shrink-0" title="Open in Google Maps">
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+            </a>
+          )}
+        </div>
+      ) : <span className="text-slate-400 text-xs">—</span>
+    ) },
     { key: 'hours', header: 'Working Hours', render: (r) => hm(r.workedMinutes) },
     { key: 'status', header: 'Status', render: (r) => <StatusPill s={r.status} /> },
-    { key: 'loc', header: 'Location', render: (r) => <span className="text-xs text-slate-500">{locText(r.checkInLocation)}</span> },
     { key: 'remarks', header: 'Remarks', render: (r) => <span className="text-xs text-slate-500">{r.checkInRemarks || r.checkOutRemarks || '—'}</span> },
     { key: 'actions', header: '', render: (r) => (
       <div className="flex justify-end gap-1.5">
@@ -150,6 +218,58 @@ export default function MyAttendancePage() {
           <Field label="Total Working Hours" value={hm(today?.workedMinutes)} />
           <Field label="Office Working Hours" value={<span className="text-sm text-slate-700">{OFFICE_HOURS}</span>} />
         </div>
+
+        {/* Check-In and Check-Out Location Display */}
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 rounded-xl bg-slate-50 p-3.5 border border-slate-200">
+          <div className="rounded-lg bg-white p-3 border border-slate-200/80 shadow-2xs">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[17px] text-emerald-600">location_on</span>
+              Check-In Location
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-slate-800">
+                {today?.checkInAt ? locText(today?.checkInLocation) : <span className="text-slate-400 italic font-normal">Not checked in yet</span>}
+              </span>
+              {today?.checkInLocation?.lat != null && (
+                <a
+                  href={`https://www.google.com/maps?q=${today.checkInLocation.lat},${today.checkInLocation.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 text-xs text-blue-600 hover:text-blue-700 hover:underline font-semibold"
+                  title="Open in Google Maps"
+                >
+                  <span>View Map</span>
+                  <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                </a>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-white p-3 border border-slate-200/80 shadow-2xs">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[17px] text-blue-600">location_on</span>
+              Check-Out Location
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-slate-800">
+                {today?.checkOutAt ? locText(today?.checkOutLocation) : (checkedIn ? <span className="text-amber-600 italic font-medium">Pending Check-Out</span> : <span className="text-slate-400 italic font-normal">—</span>)}
+              </span>
+              {today?.checkOutLocation?.lat != null && (
+                <a
+                  href={`https://www.google.com/maps?q=${today.checkOutLocation.lat},${today.checkOutLocation.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 text-xs text-blue-600 hover:text-blue-700 hover:underline font-semibold"
+                  title="Open in Google Maps"
+                >
+                  <span>View Map</span>
+                  <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="mt-5 flex flex-wrap items-center gap-3">
           {!checkedIn && <Button variant="success" onClick={() => setAction('in')}>📍 Check-In</Button>}
           {checkedIn && !checkedOut && <Button onClick={() => setAction('out')}>Check-Out</Button>}
@@ -202,7 +322,17 @@ function MarkModal({ kind, record, onClose, onDone }) {
   const [busy, setBusy] = useState(false)
   const isIn = kind === 'in'
 
-  useEffect(() => { getLocation().then((g) => { setGeo(g); setLocating(false) }) }, []) // capture GPS on mount
+  const detectLocation = () => {
+    setLocating(true)
+    getLocation().then((g) => {
+      setGeo(g)
+      setLocating(false)
+    })
+  }
+
+  useEffect(() => {
+    detectLocation()
+  }, []) // capture GPS on mount
 
   const projectedMin = !isIn && record?.checkInAt ? Math.max(0, Math.round((Date.now() - new Date(record.checkInAt)) / 60000)) : 0
 
@@ -246,8 +376,50 @@ function MarkModal({ kind, record, onClose, onDone }) {
         <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
           <div className="flex justify-between"><span className="text-slate-500">Date</span><span className="font-medium">{formatDate(new Date())}</span></div>
           <div className="mt-1 flex justify-between"><span className="text-slate-500">{isIn ? 'Check-In' : 'Check-Out'} Time</span><span className="font-medium">{new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span></div>
-          <div className="mt-1 flex justify-between"><span className="text-slate-500">GPS Location</span><span className="font-medium">{locating ? 'Locating…' : geo ? geo.address : 'Unavailable'}</span></div>
-          {!isIn && <div className="mt-1 flex justify-between"><span className="text-slate-500">Working Hours</span><span className="font-medium">{hm(projectedMin)}</span></div>}
+          <div className="mt-2 flex items-start justify-between gap-3 border-t border-slate-200/70 pt-2">
+            <span className="text-slate-500 flex items-center gap-1 font-medium">
+              <span className="material-symbols-outlined text-[16px] text-blue-600">my_location</span>
+              Captured Location
+            </span>
+            <div className="text-right max-w-[240px]">
+              {locating ? (
+                <span className="inline-flex items-center gap-1 text-blue-600 font-medium">
+                  <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                  Detecting GPS…
+                </span>
+              ) : geo ? (
+                <div className="flex flex-col items-end">
+                  <span className="font-medium text-slate-800 flex items-center gap-1 text-right">
+                    <span className="material-symbols-outlined text-[15px] text-emerald-600">location_on</span>
+                    {geo.address}
+                  </span>
+                  {geo.lat != null && (
+                    <a
+                      href={`https://www.google.com/maps?q=${geo.lat},${geo.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5 mt-0.5"
+                    >
+                      <span>View on Google Maps</span>
+                      <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-end">
+                  <span className="text-amber-700 font-medium text-xs">GPS permission not granted or unavailable</span>
+                  <button
+                    type="button"
+                    onClick={detectLocation}
+                    className="text-[11px] text-blue-600 hover:underline mt-0.5 inline-flex items-center gap-0.5 font-medium cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">refresh</span> Retry GPS
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {!isIn && <div className="mt-2 flex justify-between border-t border-slate-200/70 pt-2"><span className="text-slate-500">Working Hours</span><span className="font-medium">{hm(projectedMin)}</span></div>}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Remarks (optional)</label>
@@ -280,8 +452,26 @@ function DetailsModal({ record: r, onClose }) {
           ['Check-Out Time', time(r.checkOutAt)],
           ['Working Hours', hm(r.workedMinutes)],
           ['Attendance Status', <StatusPill key="status" s={r.status} />],
-          ['GPS Check-In Location', locText(r.checkInLocation)],
-          ['GPS Check-Out Location', locText(r.checkOutLocation)],
+          ['GPS Check-In Location', r.checkInLocation ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span>{locText(r.checkInLocation)}</span>
+              {r.checkInLocation.lat != null && (
+                <a href={`https://www.google.com/maps?q=${r.checkInLocation.lat},${r.checkInLocation.lng}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs flex items-center gap-0.5">
+                  <span className="material-symbols-outlined text-[13px]">open_in_new</span> Map
+                </a>
+              )}
+            </div>
+          ) : '—'],
+          ['GPS Check-Out Location', r.checkOutLocation ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span>{locText(r.checkOutLocation)}</span>
+              {r.checkOutLocation.lat != null && (
+                <a href={`https://www.google.com/maps?q=${r.checkOutLocation.lat},${r.checkOutLocation.lng}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs flex items-center gap-0.5">
+                  <span className="material-symbols-outlined text-[13px]">open_in_new</span> Map
+                </a>
+              )}
+            </div>
+          ) : '—'],
           ['Check-In Remarks', r.checkInRemarks || '—'],
           ['Check-Out Remarks', r.checkOutRemarks || '—'],
         ].map(([label, value]) => (

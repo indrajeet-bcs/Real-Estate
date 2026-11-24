@@ -81,8 +81,8 @@ export default function CustomerSupportPage() {
           tickets={tickets} meta={meta} loading={loading} error={error} refetch={refetch} onOpen={setOpenId} canReopen={canReopen}
           filters={{ search, status, priority }}
           setSearch={(v) => { setSearch(v); setPage(1) }}
-          setStatus={(v) => { setStatus(v); setPage(1) }}
-          setPriority={(v) => { setPriority(v); setPage(1) }}
+          setStatus={(v) => { setStatus(v?.target ? v.target.value : v); setPage(1) }}
+          setPriority={(v) => { setPriority(v?.target ? v.target.value : v); setPage(1) }}
           reset={() => { setSearch(''); setStatus(''); setPriority(''); setPage(1) }}
           onPage={setPage} onPageSize={(n) => { setLimit(n); setPage(1) }}
         />
@@ -227,16 +227,6 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
   const [deletingTicket, setDeletingTicket] = useState(false)
   const hasActiveFilters = Boolean(filters.search?.trim() || filters.status || filters.priority)
 
-  const statusOptions = [
-    { value: '', label: 'All Statuses' },
-    ...STATUSES.map((s) => ({ value: s, label: s })),
-  ]
-
-  const priorityOptions = [
-    { value: '', label: 'All Priorities' },
-    ...PRIORITIES.map((p) => ({ value: p, label: p })),
-  ]
-
   const handleConfirmDeleteTicket = async () => {
     if (!ticketToDelete) return
     setDeletingTicket(true)
@@ -251,11 +241,10 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
       setDeletingTicket(false)
     }
   }
-
   return (
     <div className="space-y-5">
       {/* Redesigned Filter Panel with modern styling, clean alignment, and crisp borders */}
-      <Card className="overflow-hidden border border-slate-200 bg-white p-5 shadow-xs">
+      <Card className="border border-slate-200 bg-white p-5 shadow-xs">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[20px] text-blue-600">tune</span>
@@ -314,23 +303,29 @@ function TicketsTab({ tickets, meta, loading, error, refetch, onOpen, filters, s
           </div>
 
           <div>
-            <DropdownSelect
+            <Select
               label="Ticket Status"
               value={filters.status}
               onChange={(e) => setStatus(e.target.value)}
-              options={statusOptions}
-              placeholder="All Statuses"
-            />
+            >
+              <option value="">All Statuses</option>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </Select>
           </div>
 
           <div>
-            <DropdownSelect
+            <Select
               label="Priority Level"
               value={filters.priority}
               onChange={(e) => setPriority(e.target.value)}
-              options={priorityOptions}
-              placeholder="All Priorities"
-            />
+            >
+              <option value="">All Priorities</option>
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </Select>
           </div>
 
           <div>
