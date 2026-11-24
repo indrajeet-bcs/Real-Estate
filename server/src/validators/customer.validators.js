@@ -82,5 +82,6 @@ export const distributeSchema = z.object({
 export const importSchema = z.object({
   fileName: z.string().optional(),
   columnMapping: z.record(z.string()).optional(),
+  defaultExecutiveId: z.preprocess((val) => (val === '' || val === null ? undefined : val), objectId.optional()),
   rows: z.array(z.record(z.any())).min(1, 'No rows to import'),
 })

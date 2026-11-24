@@ -5,6 +5,7 @@ import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { titleCase } from '../../lib/format.js'
+import ImportLeadsModal from '../../components/ImportLeadsModal.jsx'
 import {
   PageHeader, Card, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
@@ -61,6 +62,7 @@ function PipelineTab() {
   const [search, setSearch] = useState('')
   const [allocator, setAllocator] = useState(false)
   const [newLead, setNewLead] = useState(false)
+  const [importExcel, setImportExcel] = useState(false)
   const [transferFor, setTransferFor] = useState(null)
 
   const openLead = (r) => navigate(`/admin/leads/${r._id}`)
@@ -99,6 +101,12 @@ function PipelineTab() {
         </div>
         <div className="flex gap-2">
           {can('lead', 'assign') && <Button variant="secondary" onClick={() => setAllocator(true)}>Run Allocator</Button>}
+          {(can('lead', 'import') || can('lead', 'create')) && (
+            <Button variant="secondary" onClick={() => setImportExcel(true)}>
+              <span className="material-symbols-outlined text-[18px]">upload_file</span>
+              <span>Import Excel</span>
+            </Button>
+          )}
           {can('lead', 'create') && <Button onClick={() => setNewLead(true)}>+ New Lead</Button>}
         </div>
       </div>
@@ -109,6 +117,7 @@ function PipelineTab() {
 
       {allocator && <AllocatorModal onClose={() => setAllocator(false)} onDone={() => { setAllocator(false); refetch() }} />}
       {newLead && <NewLeadModal execs={execs || []} onClose={() => setNewLead(false)} onDone={() => { setNewLead(false); refetch() }} />}
+      {importExcel && <ImportLeadsModal execs={execs || []} onClose={() => setImportExcel(false)} onDone={() => { setImportExcel(false); refetch() }} />}
       {transferFor && <TransferOwnershipModal customer={transferFor} execs={execs || []} onClose={() => setTransferFor(null)} onDone={() => { setTransferFor(null); refetch() }} />}
     </div>
   )

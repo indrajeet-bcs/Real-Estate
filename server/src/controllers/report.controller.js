@@ -367,9 +367,8 @@ export const attendanceReport = asyncHandler(async (req, res) => {
 
 // GET /api/reports/summary — headline KPIs for the dashboard cards.
 export const dashboardSummary = asyncHandler(async (req, res) => {
-  const scope = {}
+  const scope = { ...firmScope(req.user) }
   if (req.user.role === ROLES.SALES_EXECUTIVE) scope.assignedTo = req.user._id
-  else if (req.user.role !== ROLES.SUPER_ADMIN) scope.firm = req.user.firm
 
   const bookingScope = { ...scope }
   if (req.user.role === ROLES.SALES_EXECUTIVE) {

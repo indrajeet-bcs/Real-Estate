@@ -706,7 +706,7 @@ export function Pagination({ meta, onPage, onPageSize, pageSizeOptions = [10, 20
 }
 
 // --- Modal ---
-export function Modal({ open, onClose, title, children, footer, wide = false }) {
+export function Modal({ open, onClose, title, children, footer, wide = false, extraWide = false }) {
   useBodyScrollLock(open)
   if (!open) return null
   return (
@@ -717,7 +717,7 @@ export function Modal({ open, onClose, title, children, footer, wide = false }) 
       }}
     >
       <div
-        className={`flex max-h-[90vh] w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl overscroll-contain`}
+        className={`flex max-h-[90vh] w-full ${extraWide ? 'max-w-5xl' : wide ? 'max-w-3xl' : 'max-w-lg'} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl overscroll-contain`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">

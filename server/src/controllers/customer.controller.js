@@ -10,7 +10,7 @@ import { ok, created } from '../utils/apiResponse.js'
 import { paginate } from '../utils/paginate.js'
 import { writeAudit } from '../middleware/audit.js'
 import { notify, notifyMany } from '../services/notification.service.js'
-import { AUDIT_ACTIONS, MODULES, ROLES, CUSTOMER_STATUS, NOTIFICATION_TYPES, BOOKING_STATUS, FOLLOWUP_STATUS, VISIT_STATUS } from '../config/constants.js'
+import { AUDIT_ACTIONS, MODULES, ROLES, CUSTOMER_STATUS, LEAD_SOURCES, NOTIFICATION_TYPES, BOOKING_STATUS, FOLLOWUP_STATUS, VISIT_STATUS } from '../config/constants.js'
 import { ownershipScope, firmScope } from '../middleware/tenantScope.js'
 
 const OPEN_LEAD_STATUSES = [CUSTOMER_STATUS.NEW, CUSTOMER_STATUS.IN_PROGRESS, CUSTOMER_STATUS.FOLLOW_UP_DUE]
@@ -80,15 +80,16 @@ export const listCustomers = asyncHandler(async (req, res) => {
 
 // GET /api/customers/:id — full Customer 360° profile (§6).
 export const getCustomer = asyncHandler(async (req, res) => {
-  const filter = { _id: req.params.id, ...firmScope(req.user) }
-  // Executives can only open their own assigned customers.
-  if (req.user.role === ROLES.SALES_EXECUTIVE) filter.assignedTo = req.user._id
-
-  const customer = await Customer.findOne(filter)
+  const customer = await Customer.findOne({ _id: req.params.id, ...firmScope(req.user) })
     .populate('assignedTo', 'name email branch')
     .populate('interestedProjects.project', 'name location')
     .lean()
   if (!customer) throw ApiError.notFound('Customer not found')
+
+  // Executives can only open their own assigned customers.
+  if (req.user.role === ROLES.SALES_EXECUTIVE && String(customer.assignedTo?._id || customer.assignedTo) !== String(req.user._id)) {
+    throw ApiError.forbidden('You do not have access to this lead')
+  }
 
   // Aggregate the related timelines shown on the profile.
   const [followUps, visits, bookings] = await Promise.all([
@@ -203,10 +204,13 @@ export const createCustomer = asyncHandler(async (req, res) => {
 
 // PATCH /api/customers/:id — edit personal info.
 export const updateCustomer = asyncHandler(async (req, res) => {
-  const filter = { _id: req.params.id, ...firmScope(req.user) }
-  if (req.user.role === ROLES.SALES_EXECUTIVE) filter.assignedTo = req.user._id
-  const customer = await Customer.findOne(filter)
+  const customer = await Customer.findOne({ _id: req.params.id, ...firmScope(req.user) })
   if (!customer) throw ApiError.notFound('Customer not found')
+
+  // Executives can only edit their own assigned customers.
+  if (req.user.role === ROLES.SALES_EXECUTIVE && String(customer.assignedTo) !== String(req.user._id)) {
+    throw ApiError.forbidden('You do not have access to this lead')
+  }
 
   // Check mobile duplication if mobile is being updated
   if (req.body.mobile && req.body.mobile !== customer.mobile) {
@@ -253,6 +257,9 @@ export const updateCustomer = asyncHandler(async (req, res) => {
 
   // Clean empty strings for optional fields in req.body
   const updatePayload = { ...req.body }
+  if (req.user.role === ROLES.SALES_EXECUTIVE) {
+    delete updatePayload.assignedTo
+  }
   for (const k of ['email', 'altMobile', 'address', 'occupation', 'propertyType', 'configuration', 'preferredLocation', 'source', 'priority']) {
     if (updatePayload[k] === '') updatePayload[k] = undefined
   }
@@ -622,20 +629,38 @@ export const distributeLeads = asyncHandler(async (req, res) => {
   return ok(res, { assigned: unassigned.length, byExecutive }, `Distributed ${unassigned.length} leads via ${algorithm}`)
 })
 
-// POST /api/customers/import — bulk import with validation engine (§5).
-// Splits rows into successful / duplicate (mobile match) / failed (missing
-// mandatory fields).
+// POST /api/customers/import — bulk Excel/CSV import with validation engine (§5).
+// Splits rows into successful / duplicate (mobile match) / failed (missing or invalid fields).
+// Assigns to executive specified in row or defaultExecutiveId.
 export const importCustomers = asyncHandler(async (req, res) => {
-  const { rows, fileName, columnMapping } = req.body
+  const { rows, fileName, columnMapping, defaultExecutiveId } = req.body
 
   const batch = await ImportBatch.create({
     firm: req.user.firm,
-    fileName,
-    columnMapping,
+    fileName: fileName || 'leads_import.xlsx',
+    columnMapping: columnMapping || {},
     totalRows: rows.length,
     importedBy: req.user._id,
     status: 'processing',
   })
+
+  // Fetch all active firm users to map Sales Executives
+  const firmUsers = await User.find({ firm: req.user.firm, isActive: true }).select('_id name email role').lean()
+  const idMap = new Map()
+  const nameMap = new Map()
+  const emailMap = new Map()
+
+  for (const u of firmUsers) {
+    idMap.set(String(u._id), u)
+    nameMap.set(u.name.toLowerCase().trim(), u)
+    if (u.email) emailMap.set(u.email.toLowerCase().trim(), u)
+  }
+
+  // Validate defaultExecutiveId if provided
+  let defaultExecUser = null
+  if (defaultExecutiveId && idMap.has(String(defaultExecutiveId))) {
+    defaultExecUser = idMap.get(String(defaultExecutiveId))
+  }
 
   // Existing mobiles in the firm for dedup.
   const existing = await Customer.find({ firm: req.user.firm }).select('mobile').lean()
@@ -645,30 +670,125 @@ export const importCustomers = asyncHandler(async (req, res) => {
   const toCreate = []
   const duplicateRows = []
   const failedRows = []
+  const notifyCounts = new Map()
+
+  const normalizePhone = (val) => {
+    if (!val) return ''
+    let d = String(val).replace(/\D/g, '')
+    if (d.length === 12 && d.startsWith('91')) d = d.slice(2)
+    else if (d.length === 11 && d.startsWith('0')) d = d.slice(1)
+    return d
+  }
+
+  const validSources = new Set(LEAD_SOURCES)
+  const validStatuses = new Set(Object.values(CUSTOMER_STATUS))
 
   for (const row of rows) {
-    const name = (row.name || '').toString().trim()
-    const mobile = (row.mobile || '').toString().trim()
+    const name = (row.name || row.fullName || '').toString().trim()
+    const rawMobile = row.mobile || row.phoneNumber || row.contact || ''
+    const mobile = normalizePhone(rawMobile)
 
-    // Failed: missing mandatory fields.
-    if (!name || !mobile) {
-      failedRows.push({ row, reason: 'Missing mandatory field (name and mobile required)' })
+    // Failed: missing mandatory fields or invalid format
+    if (!name || name.length < 2) {
+      failedRows.push({ row, reason: 'Name is required (at least 2 characters)' })
       continue
     }
-    // Duplicate: mobile already exists (in DB or earlier in this batch).
-    if (existingMobiles.has(mobile) || seenInBatch.has(mobile)) {
-      duplicateRows.push({ row, reason: 'Mobile number already exists' })
+    if (!mobile || !/^[6-9]\d{9}$/.test(mobile)) {
+      failedRows.push({ row, reason: 'Invalid mobile: must be 10 digits starting with 6, 7, 8, or 9' })
+      continue
+    }
+
+    // Duplicate: mobile already exists in CRM or within batch
+    if (existingMobiles.has(mobile)) {
+      duplicateRows.push({ row, reason: `Mobile ${mobile} already exists in CRM` })
+      continue
+    }
+    if (seenInBatch.has(mobile)) {
+      duplicateRows.push({ row, reason: `Mobile ${mobile} is duplicated within the import file` })
       continue
     }
     seenInBatch.add(mobile)
+
+    // Resolve Sales Executive
+    let assignedUser = null
+    const execQuery = (row.salesExecutive || row.assignedTo || row.executive || row.employee || '').toString().trim()
+    if (execQuery) {
+      if (idMap.has(execQuery)) {
+        assignedUser = idMap.get(execQuery)
+      } else if (nameMap.has(execQuery.toLowerCase())) {
+        assignedUser = nameMap.get(execQuery.toLowerCase())
+      } else if (emailMap.has(execQuery.toLowerCase())) {
+        assignedUser = emailMap.get(execQuery.toLowerCase())
+      }
+    }
+
+    // Fallback to default executive if not matched in row
+    if (!assignedUser && defaultExecUser) {
+      assignedUser = defaultExecUser
+    }
+
+    const assignedTo = assignedUser ? assignedUser._id : null
+    if (assignedTo) {
+      notifyCounts.set(String(assignedTo), (notifyCounts.get(String(assignedTo)) || 0) + 1)
+    }
+
+    // Normalize source
+    let source = (row.source || '').toString().trim().toLowerCase().replace(/[\s-]+/g, '_')
+    if (!validSources.has(source)) {
+      if (source === 'housing' || source === 'housingcom') source = 'housing_com'
+      else if (source === 'walkin') source = 'walk_in'
+      else if (source === 'social' || source === 'socialmedia') source = 'social_media'
+      else if (source === 'coldcall') source = 'cold_call'
+      else if (source === 'channelpartner') source = 'channel_partner'
+      else source = 'bulk_import'
+    }
+
+    // Normalize priority
+    let priority = (row.priority || '').toString().trim().toLowerCase()
+    if (!['low', 'medium', 'high'].includes(priority)) priority = 'medium'
+
+    // Normalize status
+    let status = (row.status || '').toString().trim().toLowerCase().replace(/[\s-]+/g, '_')
+    if (!validStatuses.has(status)) status = CUSTOMER_STATUS.NEW
+
+    // Budgets
+    const budgetMin = row.budgetMin && !isNaN(Number(row.budgetMin)) ? Number(row.budgetMin) : undefined
+    const budgetMax = row.budgetMax && !isNaN(Number(row.budgetMax)) ? Number(row.budgetMax) : undefined
+
+    // Notes
+    const notes = []
+    const noteText = (row.notes || row.remarks || row.comment || '').toString().trim()
+    if (noteText) {
+      notes.push({ type: 'general', text: noteText, createdBy: req.user._id })
+    }
+
     toCreate.push({
       firm: req.user.firm,
       name,
       mobile,
-      email: row.email?.toString().trim() || undefined,
+      altMobile: normalizePhone(row.altMobile) || undefined,
+      email: row.email ? String(row.email).toLowerCase().trim() : undefined,
       address: row.address?.toString().trim() || undefined,
-      source: 'bulk_import',
-      status: CUSTOMER_STATUS.NEW,
+      occupation: row.occupation?.toString().trim() || undefined,
+      budgetMin,
+      budgetMax,
+      propertyType: row.propertyType?.toString().trim() || undefined,
+      configuration: row.configuration?.toString().trim() || undefined,
+      preferredLocation: row.preferredLocation?.toString().trim() || undefined,
+      source,
+      priority,
+      status,
+      assignedTo,
+      assignedAt: assignedTo ? new Date() : undefined,
+      notes,
+      activity: [
+        {
+          action: 'created',
+          description: `Lead imported via Excel by ${req.user.name}${assignedUser ? ` (Assigned to: ${assignedUser.name})` : ''}`,
+          actor: req.user._id,
+          at: new Date(),
+        },
+      ],
       importBatch: batch._id,
       createdBy: req.user._id,
     })
@@ -684,12 +804,24 @@ export const importCustomers = asyncHandler(async (req, res) => {
   batch.status = 'completed'
   await batch.save()
 
+  // Notify assigned sales executives
+  for (const [execId, count] of notifyCounts) {
+    notify({
+      firm: req.user.firm,
+      recipient: execId,
+      type: NOTIFICATION_TYPES.LEAD_ASSIGNED,
+      title: 'New leads assigned',
+      message: `${count} new lead(s) imported and assigned to you`,
+      entityType: 'customer',
+    })
+  }
+
   writeAudit({
     req,
     action: AUDIT_ACTIONS.IMPORT,
     module: MODULES.LEAD,
     targetId: batch._id,
-    description: `Imported ${inserted.length} leads (${duplicateRows.length} dup, ${failedRows.length} failed)`,
+    description: `Imported ${inserted.length} leads (${duplicateRows.length} duplicates, ${failedRows.length} failed)`,
   })
 
   return created(
@@ -700,15 +832,16 @@ export const importCustomers = asyncHandler(async (req, res) => {
       duplicates: duplicateRows,
       failed: failedRows,
     },
-    'Import processed'
+    `Import completed: ${inserted.length} imported, ${duplicateRows.length} duplicates, ${failedRows.length} failed`
   )
 })
 
 // Shared helper: load a customer the actor is allowed to act on.
 async function findOwned(req) {
-  const filter = { _id: req.params.id, ...firmScope(req.user) }
-  if (req.user.role === ROLES.SALES_EXECUTIVE) filter.assignedTo = req.user._id
-  const customer = await Customer.findOne(filter)
+  const customer = await Customer.findOne({ _id: req.params.id, ...firmScope(req.user) })
   if (!customer) throw ApiError.notFound('Customer not found')
+  if (req.user.role === ROLES.SALES_EXECUTIVE && String(customer.assignedTo) !== String(req.user._id)) {
+    throw ApiError.forbidden('You do not have access to this lead')
+  }
   return customer
 }

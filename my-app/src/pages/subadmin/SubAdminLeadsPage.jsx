@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { PageHeader, Card, StatCard, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState } from '../../components/ui.jsx'
 import { TransferOwnershipModal } from '../admin/LeadsPage.jsx'
+import ImportLeadsModal from '../../components/ImportLeadsModal.jsx'
 
 const inr = (n) => {
   const v = Number(n) || 0
@@ -30,6 +31,7 @@ export default function SubAdminLeadsPage() {
   const [source, setSource] = useState('all')
   const [priority, setPriority] = useState('all')
   const [adding, setAdding] = useState(false)
+  const [importExcel, setImportExcel] = useState(false)
   const [transferFor, setTransferFor] = useState(null)
 
   const { data, loading, error, refetch } = useFetch(useCallback(() => customersApi.list({ limit: 500 }), []))
@@ -103,7 +105,10 @@ export default function SubAdminLeadsPage() {
         subtitle="Track, assign, transfer and convert branch leads."
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => navigate('/sub-admin/leads/import')}>Import</Button>
+            <Button variant="secondary" onClick={() => setImportExcel(true)}>
+              <span className="material-symbols-outlined text-[18px]">upload_file</span>
+              <span>Import Excel</span>
+            </Button>
             <Button variant="secondary" onClick={() => navigate('/sub-admin/leads/assign')}>Bulk Assign</Button>
             <Button variant="secondary" onClick={exportCsv} disabled={!filtered.length}>Export</Button>
             <Button onClick={() => setAdding(true)}>+ Add Lead</Button>
@@ -159,6 +164,7 @@ export default function SubAdminLeadsPage() {
       )}
 
       {adding && <AddLeadModal execs={execs || []} onClose={() => setAdding(false)} onDone={() => { setAdding(false); refetch() }} />}
+      {importExcel && <ImportLeadsModal execs={execs || []} onClose={() => setImportExcel(false)} onDone={() => { setImportExcel(false); refetch() }} />}
       {transferFor && <TransferOwnershipModal customer={transferFor} execs={execs || []} onClose={() => setTransferFor(null)} onDone={() => { setTransferFor(null); refetch() }} />}
       {decideReq && <DecideTransferModal request={decideReq} execs={execs || []} onClose={() => setDecideReq(null)} onDone={() => { setDecideReq(null); refetchReqs(); refetch() }} />}
     </div>

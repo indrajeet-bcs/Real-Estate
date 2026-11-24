@@ -341,9 +341,10 @@ export const reassignVisit = asyncHandler(async (req, res) => {
 })
 
 async function findOwnedVisit(req) {
-  const filter = { _id: req.params.id, ...firmScope(req.user) }
-  if (req.user.role === ROLES.SALES_EXECUTIVE) filter.assignedTo = req.user._id
-  const visit = await SiteVisit.findOne(filter)
+  const visit = await SiteVisit.findOne({ _id: req.params.id, ...firmScope(req.user) })
   if (!visit) throw ApiError.notFound('Visit not found')
+  if (req.user.role === ROLES.SALES_EXECUTIVE && String(visit.assignedTo) !== String(req.user._id)) {
+    throw ApiError.forbidden('Visit is not assigned to you')
+  }
   return visit
 }

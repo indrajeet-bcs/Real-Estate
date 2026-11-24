@@ -251,9 +251,10 @@ export const cancelFollowUp = asyncHandler(async (req, res) => {
 })
 
 async function findOwnedFollowUp(req) {
-  const filter = { _id: req.params.id, ...firmScope(req.user) }
-  if (req.user.role === ROLES.SALES_EXECUTIVE) filter.assignedTo = req.user._id
-  const followUp = await FollowUp.findOne(filter)
+  const followUp = await FollowUp.findOne({ _id: req.params.id, ...firmScope(req.user) })
   if (!followUp) throw ApiError.notFound('Follow-up not found')
+  if (req.user.role === ROLES.SALES_EXECUTIVE && String(followUp.assignedTo) !== String(req.user._id)) {
+    throw ApiError.forbidden('Follow-up is not assigned to you')
+  }
   return followUp
 }
