@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Modal, Button, Input, Select } from '../ui.jsx'
 import { usersApi, branchesApi } from '../../api/resources.js'
 import { useToast } from '../../context/ToastContext.jsx'
@@ -6,7 +6,6 @@ import { useToast } from '../../context/ToastContext.jsx'
 const ROLE_OPTIONS = [
   { value: 'sales_executive', label: 'Sales Executive', desc: 'Can manage own leads, follow-ups, visits, and bookings' },
   { value: 'sub_admin', label: 'Sub-Admin (Branch Admin)', desc: 'Full operational access over assigned branch and team' },
-  { value: 'telecaller', label: 'Telecaller', desc: 'Handles lead qualification, calling queues, and follow-ups' },
   { value: 'admin', label: 'Admin', desc: 'Full firm administrator privileges' },
 ]
 
@@ -65,64 +64,88 @@ export default function UserRegistrationModal({
   const [busy, setBusy] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // Load branches if not passed
+  const prevOpenRef = useRef(false)
+  const prevUserIdRef = useRef(null)
+
+  // Load branches once if not passed
   useEffect(() => {
-    if (initialBranches && initialBranches.length > 0) {
+    if (Array.isArray(initialBranches) && initialBranches.length > 0) {
       setBranches(initialBranches)
     } else {
+      let active = true
       branchesApi.list({ limit: 100 })
         .then((res) => {
+          if (!active) return
           const bList = res.data?.data || res.data || []
-          setBranches(Array.isArray(bList) ? bList : [])
+          if (Array.isArray(bList) && bList.length > 0) {
+            setBranches(bList)
+          }
         })
-        .catch(() => setBranches([]))
+        .catch(() => {})
+      return () => { active = false }
     }
-  }, [initialBranches])
+  }, [initialBranches?.length])
 
-  // Populate when editing an existing user
+  // Populate/reset ONLY when modal freshly opens or edited user changes
   useEffect(() => {
-    if (user) {
-      setForm({
-        name: user.name || '',
-        email: user.email || '',
-        password: '',
-        phone: user.phone || '',
-        role: user.role || defaultRole,
-        branch: user.branch || '',
-        department: user.department || 'Direct Sales',
-        designation: user.designation || '',
-        joiningDate: user.joiningDate ? String(user.joiningDate).slice(0, 10) : '',
-        targetRevenue: user.targetRevenue ? String(user.targetRevenue) : '',
-        targetSales: user.targetSales ? String(user.targetSales) : '',
-        dob: user.dob ? String(user.dob).slice(0, 10) : '',
-        gender: user.gender || '',
-        address: user.address || '',
-        emergencyContactName: user.emergencyContactName || '',
-        emergencyContactNumber: user.emergencyContactNumber || '',
-      })
-    } else {
-      setForm({
-        name: '',
-        email: '',
-        password: '',
-        phone: '',
-        role: defaultRole,
-        branch: initialBranches?.[0]?.name || '',
-        department: 'Direct Sales',
-        designation: '',
-        joiningDate: new Date().toISOString().slice(0, 10),
-        targetRevenue: '',
-        targetSales: '',
-        dob: '',
-        gender: '',
-        address: '',
-        emergencyContactName: '',
-        emergencyContactNumber: '',
-      })
+    const isOpening = open && !prevOpenRef.current
+    const currentUserId = user?._id || user?.id || null
+    const userChanged = currentUserId !== prevUserIdRef.current
+
+    if (isOpening || userChanged) {
+      if (user) {
+        setForm({
+          name: user.name || '',
+          email: user.email || '',
+          password: '',
+          phone: user.phone || '',
+          role: user.role || defaultRole,
+          branch: user.branch || '',
+          department: user.department || 'Direct Sales',
+          designation: user.designation || '',
+          joiningDate: user.joiningDate ? String(user.joiningDate).slice(0, 10) : '',
+          targetRevenue: user.targetRevenue ? String(user.targetRevenue) : '',
+          targetSales: user.targetSales ? String(user.targetSales) : '',
+          dob: user.dob ? String(user.dob).slice(0, 10) : '',
+          gender: user.gender || '',
+          address: user.address || '',
+          emergencyContactName: user.emergencyContactName || '',
+          emergencyContactNumber: user.emergencyContactNumber || '',
+        })
+      } else {
+        setForm({
+          name: '',
+          email: '',
+          password: '',
+          phone: '',
+          role: defaultRole,
+          branch: branches?.[0]?.name || initialBranches?.[0]?.name || '',
+          department: 'Direct Sales',
+          designation: '',
+          joiningDate: new Date().toISOString().slice(0, 10),
+          targetRevenue: '',
+          targetSales: '',
+          dob: '',
+          gender: '',
+          address: '',
+          emergencyContactName: '',
+          emergencyContactNumber: '',
+        })
+      }
+      setErrorMsg('')
+      setActiveTab('credentials')
     }
-    setErrorMsg('')
-    setActiveTab('credentials')
-  }, [user, defaultRole, initialBranches, open])
+
+    prevOpenRef.current = Boolean(open)
+    prevUserIdRef.current = user?._id || user?.id || null
+  }, [open, user, defaultRole])
+
+  // Auto-fill initial branch if empty once branches load
+  useEffect(() => {
+    if (branches.length > 0 && isNew) {
+      setForm((prev) => (!prev.branch ? { ...prev, branch: branches[0]?.name || '' } : prev))
+    }
+  }, [branches, isNew])
 
   const setField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -141,11 +164,30 @@ export default function UserRegistrationModal({
   const isPasswordValid = form.password ? form.password.length >= 8 : true
   const isPhoneValid = !form.phone || /^[0-9+ -]{7,15}$/.test(form.phone.trim())
 
-  const canSubmit = isNameValid && isEmailValid && isPasswordValid && !busy
+  const canSubmit = isNameValid && isEmailValid && isPasswordValid && isPhoneValid && !busy
 
   const handleSave = async (e) => {
     if (e) e.preventDefault()
-    if (!canSubmit) return
+    if (!form.name.trim() || form.name.trim().length < 2) {
+      setErrorMsg('Please enter a full name (at least 2 characters)')
+      setActiveTab('credentials')
+      return
+    }
+    if (isNew && (!form.email.trim() || !emailRegex.test(form.email.trim()))) {
+      setErrorMsg('Please enter a valid email address')
+      setActiveTab('credentials')
+      return
+    }
+    if (form.password && form.password.length < 8) {
+      setErrorMsg('Password must be at least 8 characters if provided')
+      setActiveTab('credentials')
+      return
+    }
+    if (form.phone && !isPhoneValid) {
+      setErrorMsg('Please enter a valid phone number (7 to 15 digits)')
+      setActiveTab('credentials')
+      return
+    }
 
     setBusy(true)
     setErrorMsg('')
@@ -250,7 +292,7 @@ export default function UserRegistrationModal({
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={!canSubmit || busy}
+              disabled={busy}
               className="min-w-[130px]"
             >
               {busy ? (
@@ -329,13 +371,14 @@ export default function UserRegistrationModal({
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">
+              <div className="mb-1 block text-xs font-semibold text-slate-700">
                 Full Name <span className="text-rose-500">*</span>
-              </label>
+              </div>
               <Input
                 placeholder="e.g. Rahul Sharma"
                 value={form.name}
                 onChange={(e) => setField('name', e.target.value)}
+                autoComplete="off"
               />
               {!isNameValid && form.name && (
                 <p className="mt-1 text-[11px] text-rose-500">Name must be at least 2 characters</p>
@@ -343,13 +386,14 @@ export default function UserRegistrationModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">
-                Mobile Number <span className="text-red-500">*</span>
-              </label>
+              <div className="mb-1 block text-xs font-semibold text-slate-700">
+                Mobile Number
+              </div>
               <Input
                 placeholder="e.g. 9876543210"
                 value={form.phone}
                 onChange={(e) => setField('phone', e.target.value)}
+                autoComplete="off"
               />
               {!isPhoneValid && (
                 <p className="mt-1 text-[11px] text-rose-500">Please enter a valid phone number</p>
@@ -359,15 +403,16 @@ export default function UserRegistrationModal({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-700">
+              <div className="mb-1 block text-xs font-semibold text-slate-700">
                 Email Address {isNew && <span className="text-rose-500">*</span>}
-              </label>
+              </div>
               <Input
                 type="email"
                 placeholder="e.g. rahul@company.com"
                 value={form.email}
                 disabled={!isNew}
                 onChange={(e) => setField('email', e.target.value)}
+                autoComplete="off"
               />
               {isNew && !isEmailValid && form.email && (
                 <p className="mt-1 text-[11px] text-rose-500">Enter a valid email address</p>
@@ -378,7 +423,7 @@ export default function UserRegistrationModal({
             </div>
 
             <div>
-              <label className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-700">
+              <div className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-700">
                 <span>
                   {isNew ? 'Initial Password (Optional)' : 'Reset Password (Optional)'}
                 </span>
@@ -387,7 +432,7 @@ export default function UserRegistrationModal({
                     {form.password.length >= 8 ? '✓ Length OK' : `${form.password.length}/8 chars`}
                   </span>
                 )}
-              </label>
+              </div>
               <div className="relative">
                 <Input
                   type={showPassword ? 'text' : 'password'}

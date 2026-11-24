@@ -85,10 +85,14 @@ function CreateModal({ role, onClose, onDone }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   async function save() {
+    if (form.password && form.password.length < 8) {
+      toast.error('Password must be at least 8 characters if provided')
+      return
+    }
     setBusy(true)
     try {
-      await usersApi.create(form)
-      toast.success('User created')
+      await usersApi.create({ ...form, password: form.password || undefined })
+      toast.success('User created (activation email sent)')
       onDone()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed')
@@ -101,13 +105,13 @@ function CreateModal({ role, onClose, onDone }) {
     <Modal open onClose={onClose} title={`Add ${titleCase(role)}`} footer={
       <>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={save} disabled={busy || !form.name || !form.email || form.password.length < 8}>Create</Button>
+        <Button onClick={save} disabled={busy || !form.name || !form.email || (form.password && form.password.length < 8)}>Create</Button>
       </>
     }>
       <div className="space-y-4">
         <Input label="Full name" value={form.name} onChange={set('name')} />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} />
-        <Input label="Password (min 8 chars)" type="password" value={form.password} onChange={set('password')} />
+        <Input label="Password (optional)" type="password" placeholder="Leave blank to send OTP email" value={form.password} onChange={set('password')} />
         <Input label="Phone" value={form.phone} onChange={set('phone')} />
         <Input label="Branch" value={form.branch} onChange={set('branch')} />
       </div>

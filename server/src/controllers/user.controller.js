@@ -62,6 +62,7 @@ async function attachUserMetrics(users) {
 
 // Roles a given actor is allowed to create/manage (strictly lower rank).
 function manageableRoles(actorRole) {
+  if (actorRole === ROLES.SUPER_ADMIN) return [ROLES.ADMIN, ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE]
   if (actorRole === ROLES.ADMIN) return [ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE]
   if (actorRole === ROLES.SUB_ADMIN) return [ROLES.SALES_EXECUTIVE]
   return []
@@ -251,13 +252,23 @@ export const createUser = asyncHandler(async (req, res) => {
     ? req.body.password
     : crypto.randomBytes(16).toString('hex') + 'A1!'
 
+  const joiningDate = req.body.joiningDate && !isNaN(new Date(req.body.joiningDate).getTime())
+    ? new Date(req.body.joiningDate)
+    : new Date()
+
+  const dob = req.body.dob && !isNaN(new Date(req.body.dob).getTime())
+    ? new Date(req.body.dob)
+    : undefined
+
   const user = await User.create({
     ...req.body,
     email: cleanEmail,
     password: tempPassword,
     employeeId,
-    joiningDate: req.body.joiningDate || new Date(),
+    joiningDate,
+    dob,
     firm: req.user.firm, // scoped to creator's firm
+    role,
     // Executives created by a sub-admin report to that sub-admin by default.
     manager: req.body.manager || (req.user.role === ROLES.SUB_ADMIN ? req.user._id : undefined),
     isActive: true,

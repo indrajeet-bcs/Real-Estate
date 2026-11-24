@@ -107,6 +107,8 @@ function TabButton({ active, onClick, children }) {
 }
 
 const EMPTY_FILTERS = { branch: '', subAdmin: '', status: 'all', performance: 'all', targetStatus: 'all', joinFrom: '', joinTo: '' }
+const ALLOWED_STAFF_ROLES = ['sub_admin', 'sales_executive']
+const EMPTY_BRANCH_LIST = []
 
 function RosterTab() {
   const { can } = useAuth()
@@ -294,8 +296,8 @@ function RosterTab() {
         <UserRegistrationModal
           open={!!editFor}
           user={editFor}
-          branches={branches || []}
-          allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
+          branches={branches || EMPTY_BRANCH_LIST}
+          allowedRoles={ALLOWED_STAFF_ROLES}
           defaultRole={editFor.role || 'sales_executive'}
           onClose={() => setEditFor(null)}
           onDone={() => { setEditFor(null); refetch() }}
@@ -304,8 +306,8 @@ function RosterTab() {
       {showCreate && (
         <UserRegistrationModal
           open={showCreate}
-          branches={branches || []}
-          allowedRoles={['sub_admin', 'sales_executive', 'telecaller']}
+          branches={branches || EMPTY_BRANCH_LIST}
+          allowedRoles={ALLOWED_STAFF_ROLES}
           defaultRole="sales_executive"
           onClose={() => setShowCreate(false)}
           onDone={() => { setShowCreate(false); refetch() }}
@@ -347,12 +349,8 @@ export function EmployeeModal({ user, branches = [], subAdmins = [], onClose, on
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   async function save() {
-    if (isNew && (!form.password || form.password.length < 8)) {
-      toast.error('Password must be at least 8 characters')
-      return
-    }
-    if (!isNew && form.password && form.password.trim().length > 0 && form.password.trim().length < 8) {
-      toast.error('Password must be at least 8 characters if resetting')
+    if (form.password && form.password.trim().length > 0 && form.password.trim().length < 8) {
+      toast.error('Password must be at least 8 characters if provided')
       return
     }
     setBusy(true)
@@ -361,7 +359,7 @@ export function EmployeeModal({ user, branches = [], subAdmins = [], onClose, on
         await usersApi.create({
           name: form.name,
           email: form.email,
-          password: form.password,
+          password: form.password || undefined,
           role: form.role,
           phone: form.phone,
           branch: form.branch,
@@ -372,7 +370,7 @@ export function EmployeeModal({ user, branches = [], subAdmins = [], onClose, on
           targetSales: Number(form.targetSales) || 0,
           joiningDate: form.joiningDate || undefined,
         })
-        toast.success('Employee created successfully')
+        toast.success('Employee created successfully (activation email sent)')
       } else {
         await usersApi.update(user._id, {
           name: form.name,
@@ -396,7 +394,7 @@ export function EmployeeModal({ user, branches = [], subAdmins = [], onClose, on
     } finally { setBusy(false) }
   }
 
-  const invalid = !form.name || (isNew && (!form.email || form.password.length < 8))
+  const invalid = !form.name || (isNew && !form.email) || (form.password && form.password.length < 8)
 
   return (
     <Modal open onClose={onClose} wide title={isNew ? 'Add Employee' : `Edit ${user.name}`} footer={

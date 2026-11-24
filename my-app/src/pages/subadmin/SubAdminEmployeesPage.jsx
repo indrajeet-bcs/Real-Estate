@@ -343,22 +343,26 @@ function EmployeeModal({ user, onClose, onDone }) {
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   async function save() {
+    if (form.password && form.password.length < 8) {
+      toast.error('Password must be at least 8 characters if provided')
+      return
+    }
     setBusy(true)
     try {
-      if (isNew) await usersApi.create({ ...form, role: 'sales_executive' })
+      if (isNew) await usersApi.create({ ...form, password: form.password || undefined, role: 'sales_executive' })
       else await usersApi.update(user._id, { name: form.name, phone: form.phone, designation: form.designation, branch: form.branch })
-      toast.success(isNew ? 'Employee created' : 'Employee updated')
+      toast.success(isNew ? 'Employee created (activation email sent)' : 'Employee updated')
       onDone()
     } catch (err) { toast.error(err.response?.data?.message || 'Failed') }
     finally { setBusy(false) }
   }
-  const invalid = isNew ? (!form.name || !form.email || form.password.length < 8) : form.name.trim().length < 2
+  const invalid = isNew ? (!form.name || !form.email || (form.password && form.password.length < 8)) : form.name.trim().length < 2
   return (
     <Modal open onClose={onClose} wide title={isNew ? 'Add Employee' : `Edit ${user.name}`} footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={busy || invalid}>{isNew ? 'Create' : 'Save'}</Button></>}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Full name" value={form.name} onChange={set('name')} />
         {isNew && <Input label="Email" type="email" value={form.email} onChange={set('email')} />}
-        {isNew && <Input label="Password (min 8)" type="password" value={form.password} onChange={set('password')} />}
+        {isNew && <Input label="Password (optional)" type="password" placeholder="Leave blank to send OTP email" value={form.password} onChange={set('password')} />}
         <Input label="Phone" value={form.phone} onChange={set('phone')} />
         <Input label="Designation" value={form.designation} onChange={set('designation')} />
         <Input label="Branch" value={form.branch} onChange={set('branch')} />
