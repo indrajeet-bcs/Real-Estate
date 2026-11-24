@@ -191,7 +191,7 @@ export default function ImportLeadsModal({ execs = [], onClose, onDone }) {
             const norm = normalizeKey(key)
             if (norm.includes('name') && !norm.includes('project') && !norm.includes('company')) {
               item.name = String(val).trim()
-            } else if (norm.includes('altmobile') || norm.includes('secondaryphone') || norm.includes('altphone')) {
+            } else if (norm.includes('alt') || norm.includes('alternate') || norm.includes('second')) {
               item.altMobile = String(val).trim()
             } else if (norm.includes('mobile') || norm.includes('phone') || norm.includes('contact')) {
               item.mobile = String(val).trim()
@@ -199,11 +199,11 @@ export default function ImportLeadsModal({ execs = [], onClose, onDone }) {
               item.email = String(val).trim()
             } else if (norm.includes('source')) {
               item.source = String(val).trim()
-            } else if (norm.includes('minbudget') || norm.includes('budgetmin')) {
+            } else if (norm.includes('min')) {
               item.budgetMin = String(val).trim()
-            } else if (norm.includes('maxbudget') || norm.includes('budgetmax') || norm.includes('budget')) {
+            } else if (norm.includes('max') || norm.includes('budget')) {
               item.budgetMax = String(val).trim()
-            } else if (norm.includes('propertytype') || norm.includes('type')) {
+            } else if (norm.includes('property') || norm.includes('type')) {
               item.propertyType = String(val).trim()
             } else if (norm.includes('config') || norm.includes('bhk')) {
               item.configuration = String(val).trim()
