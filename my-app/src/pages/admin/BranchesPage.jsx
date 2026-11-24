@@ -4,6 +4,7 @@ import { branchesApi, usersApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { exportRowsToCsv } from '../../lib/format.js'
 import { PageHeader, StatCard, Button, Input, Select, Modal, Table, StatusBadge, Loader, ErrorState } from '../../components/ui.jsx'
 import { TargetStatusBadge } from './BranchDetailsPage.jsx'
 
@@ -38,14 +39,7 @@ function inr(n) {
 }
 
 function downloadCSV(filename, rows) {
-  const csv = rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+  exportRowsToCsv(filename, rows)
 }
 
 export default function BranchesPage() {

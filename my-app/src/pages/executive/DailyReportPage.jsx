@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { dailyReportsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv } from '../../lib/format.js'
 import { PageHeader, Card, Button, Input, Textarea, Loader, ErrorState } from '../../components/ui.jsx'
 
 const todayKey = () => {
@@ -65,9 +65,45 @@ export default function DailyReportPage() {
     }
   }
 
+  const handleExportCsv = () => {
+    const list = history.data || []
+    if (!list.length) {
+      toast.info('No daily reports to download')
+      return
+    }
+    exportRowsToCsv('daily-reports.csv', list.map((r) => ({
+      'Date': formatDate(r.date) || r.date || '—',
+      'Submitted At': formatDate(r.submittedAt, true) || '—',
+      'Calls Made': r.callsCount || 0,
+      'Meetings': r.meetingsCount || 0,
+      'Site Visits': r.visitsCount || 0,
+      'Bookings': r.bookingsCount || 0,
+      'New Leads': r.newLeadsCount || 0,
+      'Summary': r.summary || '—',
+      'Challenges': r.challenges || '—',
+      'Tomorrow Plan': r.tomorrowPlan || '—',
+    })))
+    toast.success('Daily reports downloaded successfully (CSV)')
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Daily (EOD) Report" subtitle="Wrap up your day — log your activity, note blockers and plan tomorrow." />
+      <PageHeader
+        title="Daily (EOD) Report"
+        subtitle="Wrap up your day — log your activity, note blockers and plan tomorrow."
+        actions={
+          Boolean(history.data?.length) && (
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+          )
+        }
+      />
 
       {ctx.loading || !form ? (
         <Loader />

@@ -4,7 +4,7 @@ import { marketingApi, usersApi, branchesApi, buildersApi, projectsApi } from '.
 import { useFetch } from '../../hooks/useFetch.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate, formatMoney, titleCase } from '../../lib/format.js'
+import { formatDate, formatMoney, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Textarea, Select, Table, StatusBadge, Modal, Pagination, Loader, ErrorState, ExportMenu,
 } from '../../components/ui.jsx'
@@ -23,10 +23,7 @@ function PriorityPill({ priority }) {
 
 // CSV / Excel / print helpers (§Reports · Export).
 function downloadCSV(filename, rows) {
-  const csv = rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url)
+  exportRowsToCsv(filename, rows)
 }
 function downloadExcel(filename, sections) { const safeName = filename.replace(/\.xls[x]?$/, '.csv'); const rows = sections.flatMap((s) => [[s.title], s.head, ...s.rows, []]); downloadCSV(safeName, rows) }
 

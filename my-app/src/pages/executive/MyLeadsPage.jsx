@@ -9,7 +9,7 @@ import { customersApi, projectsApi, followupsApi, visitsApi, leadTransfersApi } 
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { formatDate, titleCase } from '../../lib/format.js'
+import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { LEAD_STAGES, LEAD_STAGE_LABELS } from '../../lib/constants.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Select, Table, Modal, Loader, ErrorState,
@@ -300,12 +300,47 @@ export default function MyLeadsPage() {
     } },
   ]
 
+  const handleExportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info('No leads to download')
+      return
+    }
+    exportRowsToCsv('my-leads.csv', filtered.map((r) => ({
+      'Lead Name': r.name || '—',
+      'Mobile': r.mobile || '—',
+      'Email': r.email || '—',
+      'Stage': stageLabel(r.status) || r.status || '—',
+      'Priority': titleCase(r.priority || 'medium'),
+      'Budget': inr(r.budgetMax || r.budgetMin),
+      'Configuration': r.configuration || '—',
+      'Project Interest': leadProject(r) || '—',
+      'Source': titleCase(r.source || '—'),
+      'Next Follow-up': r.nextFollowUp ? formatDate(r.nextFollowUp, true) : '—',
+      'Assigned Date': formatDate(r.assignedAt || r.createdAt),
+      'Address': r.address || '—',
+    })))
+    toast.success('Leads downloaded successfully (CSV)')
+  }
+
   return (
     <div>
       <PageHeader
         title="My Leads"
         subtitle="Manage your assigned leads, track progress, schedule follow-ups, and convert qualified leads into customers."
-        actions={canCreateLead ? <Button onClick={() => setAdding(true)}>+ Add Lead</Button> : null}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+            {canCreateLead && <Button onClick={() => setAdding(true)}>+ Add Lead</Button>}
+          </div>
+        }
       />
 
       {/* Top Summary Cards */}

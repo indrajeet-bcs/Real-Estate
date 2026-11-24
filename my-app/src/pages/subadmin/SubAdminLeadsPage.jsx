@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { customersApi, usersApi, reportsApi, leadTransfersApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { titleCase } from '../../lib/format.js'
+import { titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { PageHeader, Card, StatCard, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState } from '../../components/ui.jsx'
 import { TransferOwnershipModal } from '../admin/LeadsPage.jsx'
 
@@ -18,8 +18,7 @@ const STAGES = ['new', 'in_progress', 'follow_up_due', 'booked', 'lost']
 const PRIORITY_CLS = { high: 'bg-red-50 text-red-700 border-red-200', medium: 'bg-amber-50 text-amber-700 border-amber-200', low: 'bg-slate-100 text-slate-600 border-slate-200' }
 
 function csv(filename, rows) {
-  const blob = new Blob([rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url)
+  exportRowsToCsv(filename, rows)
 }
 
 export default function SubAdminLeadsPage() {

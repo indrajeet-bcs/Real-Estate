@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { followupsApi, customersApi, projectsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate, titleCase } from '../../lib/format.js'
+import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { LEAD_STAGES, LEAD_STAGE_LABELS } from '../../lib/constants.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Select, Table, Modal, Loader, ErrorState,
@@ -158,12 +158,44 @@ export default function MyFollowUpsPage() {
 
   const overdueList = rows.filter((r) => r.status === 'scheduled' && new Date(r.scheduledAt) < todayStart)
 
+  const handleExportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info('No follow-ups to download')
+      return
+    }
+    exportRowsToCsv('my-followups.csv', filtered.map((r) => ({
+      'Contact Name': r.customer?.name || '—',
+      'Mobile': r.customer?.mobile || '—',
+      'Contact Type': custType(r.customer),
+      'Project': r.project?.name || '—',
+      'Follow-up Type': titleCase(r.type || 'call'),
+      'Scheduled Date': dateOnly(r.scheduledAt),
+      'Scheduled Time': timeOnly(r.scheduledAt),
+      'Status': STATUS_META[r.status === 'scheduled' && new Date(r.scheduledAt) < todayStart ? 'overdue' : r.status]?.label || titleCase(r.status),
+      'Notes': r.note || r.notes || '—',
+    })))
+    toast.success('Follow-ups downloaded successfully (CSV)')
+  }
+
   return (
     <div>
       <PageHeader
         title="Follow-ups"
         subtitle="Manage scheduled follow-ups, record conversations, and maintain customer engagement."
-        actions={<Button onClick={() => setAdding(true)}>+ Add Follow-up</Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+            <Button onClick={() => setAdding(true)}>+ Add Follow-up</Button>
+          </div>
+        }
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

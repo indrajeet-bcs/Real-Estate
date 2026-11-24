@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { bookingsApi, customersApi, projectsApi, buildersApi, unitsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate, titleCase } from '../../lib/format.js'
+import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Select, Table, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
@@ -146,12 +146,45 @@ export default function MyBookingsPage() {
     ) },
   ]
 
+  const handleExportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info('No bookings to download')
+      return
+    }
+    exportRowsToCsv('my-bookings.csv', filtered.map((r) => ({
+      'Booking ID': bookingId(r),
+      'Customer Name': r.customer?.name || '—',
+      'Customer Mobile': r.customer?.mobile || '—',
+      'Project': projName(r),
+      'Unit Number': r.unit?.unitNumber || '—',
+      'Booking Date': formatDate(r.bookingDate || r.createdAt),
+      'Booking Amount': inr(r.bookingAmount),
+      'Total Value': inr(r.totalValue),
+      'Payment Status': titleCase(r.paymentStatus || 'pending'),
+      'Booking Status': STATUS_META[r.status]?.label || titleCase(r.status),
+    })))
+    toast.success('Bookings downloaded successfully (CSV)')
+  }
+
   return (
     <div>
       <PageHeader
         title="Bookings"
         subtitle="Create, manage, and track customer bookings from reservation to confirmation."
-        actions={<Button onClick={() => setCreating(true)}>+ Create Booking</Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+            <Button onClick={() => setCreating(true)}>+ Create Booking</Button>
+          </div>
+        }
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

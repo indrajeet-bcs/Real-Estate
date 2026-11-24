@@ -4,7 +4,7 @@ import { bookingsApi, customersApi, projectsApi, unitsApi, usersApi } from '../.
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { formatDate } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv } from '../../lib/format.js'
 import {
   PageHeader, StatCard, Button, Input, Select, Textarea, Table, StatusBadge, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
@@ -17,14 +17,7 @@ const inr = (n) => {
 }
 
 function downloadCSV(filename, rows) {
-  const csv = rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+  exportRowsToCsv(filename, rows)
 }
 
 const FINAL = (r) => (r.discount?.finalSaleAmount || Math.round((r.totalValue || 0) * (1 - (r.appliedDiscount || 0) / 100)))

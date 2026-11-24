@@ -9,7 +9,7 @@ import { customersApi, projectsApi, unitsApi, bookingsApi, leadTransfersApi } fr
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { formatDate, formatMoney, titleCase } from '../../lib/format.js'
+import { formatDate, formatMoney, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { CUSTOMER_STATUS } from '../../lib/constants.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState,
@@ -260,12 +260,46 @@ export default function MyCustomersPage() {
     } },
   ]
 
+  const handleExportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info('No customers to download')
+      return
+    }
+    exportRowsToCsv('my-customers.csv', filtered.map((r) => ({
+      'Customer Name': r.name || '—',
+      'Mobile': r.mobile || '—',
+      'Email': r.email || '—',
+      'Status': titleCase(r.status || '—'),
+      'Budget': inr(r.budgetMax || r.budgetMin),
+      'Configuration': r.configuration || '—',
+      'Booking Status': titleCase(r.bookingStatus || 'None'),
+      'Last Follow-up': r.lastFollowUp ? formatDate(r.lastFollowUp, true) : '—',
+      'Next Follow-up': r.nextFollowUp ? formatDate(r.nextFollowUp, true) : '—',
+      'Created Date': formatDate(r.createdAt),
+      'Address': r.address || '—',
+    })))
+    toast.success('Customers downloaded successfully (CSV)')
+  }
+
   return (
     <div>
       <PageHeader
         title="Customers"
         subtitle="Manage your assigned customers, maintain relationships, and track the customer journey from inquiry to booking."
-        actions={canCreateCustomer ? <Button onClick={() => setAdding(true)}>+ Add Customer</Button> : null}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+            {canCreateCustomer && <Button onClick={() => setAdding(true)}>+ Add Customer</Button>}
+          </div>
+        }
       />
 
       {/* Top Summary Cards */}

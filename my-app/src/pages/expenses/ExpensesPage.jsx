@@ -4,7 +4,7 @@ import { expensesApi, projectsApi, branchesApi, usersApi } from '../../api/resou
 import { useFetch } from '../../hooks/useFetch.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate, formatMoney, titleCase } from '../../lib/format.js'
+import { formatDate, formatMoney, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { PageHeader, Card, StatCard, Button, Input, Select, StatusBadge, Pagination, Modal, Loader, ErrorState, ExportMenu } from '../../components/ui.jsx'
 import { PAYMENT_METHODS, EXPENSE_STATUSES, DEPARTMENTS } from '../../lib/expenses.js'
 import AddExpenseModal from './AddExpenseModal.jsx'
@@ -34,7 +34,7 @@ function FileIconBtn({ title, accept, onChange }) {
 }
 
 function inr(n) { const v = Number(n) || 0; if (v >= 1e7) return `₹${(v / 1e7).toFixed(2)}Cr`; if (v >= 1e5) return `₹${(v / 1e5).toFixed(2)}L`; return `₹${v.toLocaleString('en-IN')}` }
-function downloadCSV(filename, rows) { const csv = rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n'); const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url) }
+function downloadCSV(filename, rows) { exportRowsToCsv(filename, rows) }
 function downloadExcel(filename, sections) { const safeName = filename.replace(/\.xls[x]?$/, '.csv'); const rows = sections.flatMap((s) => [[s.title], s.head, ...s.rows, []]); downloadCSV(safeName, rows) }
 
 function Bars({ items, money = false, empty = 'No data' }) {

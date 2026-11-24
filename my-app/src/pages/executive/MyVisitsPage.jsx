@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { visitsApi, customersApi, projectsApi, buildersApi, unitsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate, formatMoney, titleCase } from '../../lib/format.js'
+import { formatDate, formatMoney, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Select, Table, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
@@ -165,12 +165,45 @@ export default function MyVisitsPage() {
     ) },
   ]
 
+  const handleExportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info('No site visits to download')
+      return
+    }
+    exportRowsToCsv('my-site-visits.csv', filtered.map((r) => ({
+      'Customer Name': r.customer?.name || '—',
+      'Customer Mobile': r.customer?.mobile || '—',
+      'Project': r.project?.name || '—',
+      'Unit': r.unit?.unitNumber || '—',
+      'Visit Date': dateOnly(r.scheduledAt),
+      'Visit Time': timeOnly(r.scheduledAt),
+      'Visit Type': titleCase(r.visitType || 'first_visit'),
+      'Status': titleCase(r.status || 'scheduled'),
+      'Outcome': titleCase(r.outcome || '—'),
+      'Feedback': r.feedback || '—',
+    })))
+    toast.success('Site visits downloaded successfully (CSV)')
+  }
+
   return (
     <div>
       <PageHeader
         title="Site Visits"
         subtitle="Manage scheduled property visits, record customer feedback, and update visit outcomes."
-        actions={<Button onClick={() => setScheduling(true)}>+ Schedule Site Visit</Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+            <Button onClick={() => setScheduling(true)}>+ Schedule Site Visit</Button>
+          </div>
+        }
       />
 
       {/* Top Summary Cards */}

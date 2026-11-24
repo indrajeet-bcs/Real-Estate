@@ -325,7 +325,7 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
                       size="sm"
                       variant="primary"
                       disabled={busyStatus}
-                      onClick={() => { setStatusModal('Open'); setStatusRemark(''); setStatusError('') }}
+                      onClick={() => setReopenModalOpen(true)}
                       className="inline-flex items-center gap-1.5"
                     >
                       <span className="material-symbols-outlined text-[15px]">restart_alt</span>
@@ -346,133 +346,128 @@ export default function TicketDetailModal({ ticketId, onClose, onChanged }) {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Mandatory Resolution / Closing Remarks Modal */}
-      {statusModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm"
-          onClick={() => { setStatusModal(null); setStatusRemark(''); setStatusError('') }}
-        >
+        {/* Mandatory Resolution / Closing Remarks Modal */}
+        {statusModal && (
           <div
-            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm"
+            onClick={() => { setStatusModal(null); setStatusRemark(''); setStatusError('') }}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
-              <h3 className="font-semibold text-slate-900">
-                {statusModal === 'Resolved'
-                  ? `Mark as Resolve — ${ticket.ticketId}`
-                  : statusModal === 'Closed'
-                    ? `Close Ticket — ${ticket.ticketId}`
-                    : `Reopen Ticket — ${ticket.ticketId}`}
-              </h3>
-              <button
-                onClick={() => { setStatusModal(null); setStatusRemark(''); setStatusError('') }}
-                className="text-slate-400 hover:text-slate-700"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-slate-600">
-                {statusModal === 'Resolved'
-                  ? 'Please record details regarding how this ticket was resolved, actions taken, and the solution provided to the customer/user. This description is mandatory.'
-                  : statusModal === 'Closed'
-                    ? 'Please record closing remarks and confirmation details regarding this ticket closure. This description is mandatory.'
-                    : 'Please explain the reason for reopening this ticket for further follow-up or additional actions. This description is mandatory.'}
-              </p>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+            <div
+              className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
+                <h3 className="font-semibold text-slate-900">
                   {statusModal === 'Resolved'
-                    ? 'Resolution Details / Remarks *'
+                    ? `Mark as Resolve — ${ticket.ticketId}`
                     : statusModal === 'Closed'
-                      ? 'Closing Remarks *'
-                      : 'Reopening Reason / Follow-up Notes *'}
-                </label>
-                <textarea
-                  rows={4}
-                  value={statusRemark}
-                  onChange={(e) => {
-                    setStatusRemark(e.target.value)
-                    if (e.target.value.trim()) setStatusError('')
-                  }}
-                  placeholder={
-                    statusModal === 'Resolved'
-                      ? 'Describe in detail how this ticket was resolved, steps taken, or solution given...'
+                      ? `Close Ticket — ${ticket.ticketId}`
+                      : `Reopen Ticket — ${ticket.ticketId}`}
+                </h3>
+                <button
+                  onClick={() => { setStatusModal(null); setStatusRemark(''); setStatusError('') }}
+                  className="text-slate-400 hover:text-slate-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-slate-600">
+                  {statusModal === 'Resolved'
+                    ? 'Please record details regarding how this ticket was resolved, actions taken, and the solution provided to the customer/user. This description is mandatory.'
+                    : statusModal === 'Closed'
+                      ? 'Please record closing remarks and confirmation details regarding this ticket closure. This description is mandatory.'
+                      : 'Please explain the reason for reopening this ticket for further follow-up or additional actions. This description is mandatory.'}
+                </p>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    {statusModal === 'Resolved'
+                      ? 'Resolution Details / Remarks *'
                       : statusModal === 'Closed'
-                        ? 'Enter closing remarks, summary, or resolution confirmation...'
-                        : 'Enter why this ticket is being reopened, further follow-up required...'
-                  }
-                  className={`w-full rounded-lg border p-3 text-sm outline-none transition focus:ring-1 ${statusError
-                    ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                    : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500'
-                    }`}
-                  autoFocus
-                />
-                {statusError && <p className="mt-1 text-xs font-medium text-red-600">{statusError}</p>}
+                        ? 'Closing Remarks *'
+                        : 'Reopening Reason / Follow-up Notes *'}
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={statusRemark}
+                    onChange={(e) => {
+                      setStatusRemark(e.target.value)
+                      if (e.target.value.trim()) setStatusError('')
+                    }}
+                    placeholder={
+                      statusModal === 'Resolved'
+                        ? 'Describe in detail how this ticket was resolved, steps taken, or solution given...'
+                        : statusModal === 'Closed'
+                          ? 'Enter closing remarks, summary, or resolution confirmation...'
+                          : 'Enter why this ticket is being reopened, further follow-up required...'
+                    }
+                    className={`w-full rounded-lg border p-3 text-sm outline-none transition focus:ring-1 ${statusError
+                      ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
+                      : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500'
+                      }`}
+                    autoFocus
+                  />
+                  {statusError && <p className="mt-1 text-xs font-medium text-red-600">{statusError}</p>}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4 bg-slate-50">
+                <Button
+                  variant="ghost"
+                  onClick={() => { setStatusModal(null); setStatusRemark(''); setStatusError('') }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant={statusModal === 'Resolved' ? 'success' : 'primary'}
+                  disabled={busyStatus}
+                  loading={busyStatus}
+                  onClick={handleConfirmStatus}
+                >
+                  {statusModal === 'Resolved' ? 'Confirm Resolution' : statusModal === 'Closed' ? 'Confirm & Close' : 'Confirm Reopen'}
+                </Button>
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4 bg-slate-50">
-              <Button
-                variant="ghost"
-                onClick={() => { setStatusModal(null); setStatusRemark(''); setStatusError('') }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant={statusModal === 'Resolved' ? 'success' : 'primary'}
-                disabled={busyStatus}
-                loading={busyStatus}
-                onClick={handleConfirmStatus}
-              >
-                {statusModal === 'Resolved' ? 'Confirm Resolution' : statusModal === 'Closed' ? 'Confirm & Close' : 'Confirm Reopen'}
-              </Button>
+        {/* Delete confirmation popup */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+              <h3 className="text-base font-semibold text-slate-900">Confirm Delete</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Are you sure you want to permanently delete ticket <span className="font-semibold text-slate-700">{ticket?.ticketId}</span>? This action cannot be undone.
+              </p>
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deletingTicket}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={deletingTicket}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deletingTicket ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Delete confirmation popup */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-slate-900">Confirm Delete</h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Are you sure you want to permanently delete ticket <span className="font-semibold text-slate-700">{ticket?.ticketId}</span>? This action cannot be undone.
-            </p>
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deletingTicket}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={deletingTicket}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
-              >
-                {deletingTicket ? 'Deleting...' : 'Yes, Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </>
   )
 }
 
 function Row({ label, value }) {
-  return (
-    <div className="flex justify-between text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
-    </div>
-  )
+  return <div className="flex justify-between text-sm"><span className="text-slate-500">{label}</span><span className="font-medium text-slate-900">{value}</span></div>
 }

@@ -22,27 +22,47 @@ export function titleCase(s) {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-// Export an array of flat objects to a downloaded CSV file. Keys of the first
-// row become the header. Values are CSV-escaped. Standard RFC 4180 compliant with UTF-8 BOM.
+// Export rows (either array of objects OR array of arrays) to a downloaded CSV file.
+// Standard RFC 4180 compliant with UTF-8 BOM so Microsoft Excel and Windows open the CSV correctly.
 export function exportRowsToCsv(filename, rows) {
   if (!rows || rows.length === 0) return
-  const safeFilename = filename.endsWith('.csv') ? filename : `${filename}.csv`
-  const headers = Object.keys(rows[0])
+  const safeFilename = filename.toLowerCase().endsWith('.csv') ? filename : `${filename}.csv`
+
   const esc = (v) => {
-    const s = v == null ? '' : String(v)
-    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    if (v == null) return '""'
+    const s = String(v)
+    return `"${s.replace(/"/g, '""')}"`
   }
-  const csv = [headers.join(','), ...rows.map((r) => headers.map((h) => esc(r[h])).join(','))].join('\r\n')
-  // \uFEFF is the UTF-8 Byte Order Mark (BOM) so Microsoft Excel and Windows open the CSV correctly
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+
+  let csv = ''
+  if (Array.isArray(rows[0])) {
+    // Format: Array of arrays (e.g. [headerRow, ...dataRows])
+    csv = rows.map((r) => (Array.isArray(r) ? r.map(esc).join(',') : esc(r))).join('\r\n')
+  } else if (typeof rows[0] === 'object') {
+    // Format: Array of objects (e.g. [{ col1: 'val1', col2: 'val2' }])
+    const headers = Object.keys(rows[0])
+    const headerRow = headers.map(esc).join(',')
+    const dataRows = rows.map((r) => headers.map((h) => esc(r[h])).join(','))
+    csv = [headerRow, ...dataRows].join('\r\n')
+  } else {
+    csv = rows.map(esc).join('\r\n')
+  }
+
+  // \uFEFF is the UTF-8 Byte Order Mark (BOM) so Microsoft Excel, LibreOffice, and Windows open the CSV correctly
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
+  a.style.display = 'none'
   a.href = url
-  a.download = safeFilename
+  a.setAttribute('download', safeFilename)
   document.body.appendChild(a)
   a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  setTimeout(() => {
+    try {
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (_) {}
+  }, 2000)
 }
 
 // Tailwind classes for a status pill, keyed by status value (light theme).

@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { tasksApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate, titleCase } from '../../lib/format.js'
+import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Select, Table, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
@@ -25,6 +25,7 @@ const assigner = (t) => t.assignedBy?.name || t.assignedByName || 'Management'
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function MyTasksPage() {
+  const toast = useToast()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [priority, setPriority] = useState('all')
@@ -116,9 +117,43 @@ export default function MyTasksPage() {
     ) },
   ]
 
+  const handleExportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info('No tasks to download')
+      return
+    }
+    exportRowsToCsv('my-tasks.csv', filtered.map((t) => ({
+      'Task ID': taskId(t),
+      'Title': t.title || '—',
+      'Assigned By': assigner(t),
+      'Priority': titleCase(t.priority || 'medium'),
+      'Status': STATUS_META[t.status]?.label || titleCase(t.status || '—'),
+      'Due Date': dateOnly(t.dueDate),
+      'Created Date': formatDate(t.createdAt),
+      'Description': t.description || '—',
+    })))
+    toast.success('Tasks downloaded successfully (CSV)')
+  }
+
   return (
     <div>
-      <PageHeader title="Tasks" subtitle="View, manage, and complete tasks assigned by your Admin or Sub-Admin." />
+      <PageHeader
+        title="Tasks"
+        subtitle="View, manage, and complete tasks assigned by your Admin or Sub-Admin."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+          </div>
+        }
+      />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Total Tasks" value={kpis.total} />

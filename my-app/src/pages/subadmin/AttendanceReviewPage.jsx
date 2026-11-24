@@ -1,15 +1,14 @@
 import { useState, useCallback, useMemo } from 'react'
 import { attendanceApi, usersApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
-import { formatDate, titleCase } from '../../lib/format.js'
+import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { PageHeader, StatCard, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState } from '../../components/ui.jsx'
 
 function hours(min) { return min ? `${Math.floor(min / 60)}h ${min % 60}m` : '—' }
 function locText(loc) { return loc?.address || (loc?.lat != null ? `${loc.lat.toFixed(4)}, ${loc.lng?.toFixed(4)}` : '—') }
 
 function csv(name, rows) {
-  const blob = new Blob([rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url)
+  exportRowsToCsv(name, rows)
 }
 
 // Team attendance review (spec §Attendance Tab): KPIs, filters, GPS + details.

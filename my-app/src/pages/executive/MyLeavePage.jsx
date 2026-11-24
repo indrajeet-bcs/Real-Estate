@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { leavesApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate, titleCase } from '../../lib/format.js'
+import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Select, Table, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
@@ -85,10 +85,43 @@ export default function MyLeavePage() {
     ) },
   ]
 
+  const handleExportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info('No leave requests to download')
+      return
+    }
+    exportRowsToCsv('my-leaves.csv', filtered.map((l) => ({
+      'Request ID': leaveId(l),
+      'Leave Type': typeLabel(l.type),
+      'From': dateOnly(l.startDate),
+      'To': dateOnly(l.endDate),
+      'Days': l.days,
+      'Applied On': formatDate(l.createdAt),
+      'Status': STATUS_META[l.status]?.label || titleCase(l.status || '—'),
+      'Reason': l.reason || '—',
+    })))
+    toast.success('Leave requests downloaded successfully (CSV)')
+  }
+
   return (
     <div>
-      <PageHeader title="Leave" subtitle="Apply for leave, track leave balances, and monitor approval status."
-        actions={<Button onClick={() => setApplying(true)}>+ Apply for Leave</Button>}
+      <PageHeader
+        title="Leave"
+        subtitle="Apply for leave, track leave balances, and monitor approval status."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+            <Button onClick={() => setApplying(true)}>+ Apply for Leave</Button>
+          </div>
+        }
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

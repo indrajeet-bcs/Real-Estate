@@ -2,16 +2,11 @@ import { useState, useCallback, useEffect } from 'react'
 import { branchSettingsApi, usersApi, attendanceApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate, titleCase } from '../../lib/format.js'
+import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { PageHeader, Card, Button, Input, Loader, ErrorState } from '../../components/ui.jsx'
 
 function downloadCsv(filename, headers, rows) {
-  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const csv = [headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n')
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
+  exportRowsToCsv(filename, [headers, ...rows])
 }
 
 export default function BranchSettingsPage() {

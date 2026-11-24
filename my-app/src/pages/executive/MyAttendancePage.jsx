@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { attendanceApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { formatDate } from '../../lib/format.js'
+import { formatDate, exportRowsToCsv } from '../../lib/format.js'
 import {
   PageHeader, Card, StatCard, Button, Input, Select, Table, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
@@ -41,6 +41,7 @@ function getLocation() {
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function MyAttendancePage() {
+  const toast = useToast()
   const [month, setMonth] = useState(dayKey(new Date()).slice(0, 7)) // YYYY-MM
   const [statusFilter, setStatusFilter] = useState('all')
   const [from, setFrom] = useState('')
@@ -91,9 +92,42 @@ export default function MyAttendancePage() {
     ) },
   ]
 
+  const handleExportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info('No attendance records to download')
+      return
+    }
+    exportRowsToCsv('my-attendance.csv', filtered.map((r) => ({
+      'Date': formatDate(r.date) || r.date || '—',
+      'Check-In': time(r.checkInAt),
+      'Check-Out': time(r.checkOutAt),
+      'Working Hours': hm(r.workedMinutes),
+      'Status': STATUS_META[r.status]?.label || r.status || '—',
+      'Location': locText(r.checkInLocation),
+      'Remarks': r.checkInRemarks || r.checkOutRemarks || '—',
+    })))
+    toast.success('Attendance records downloaded successfully (CSV)')
+  }
+
   return (
     <div>
-      <PageHeader title="Attendance" subtitle="Manage your daily attendance, track working hours, and view attendance history." />
+      <PageHeader
+        title="Attendance"
+        subtitle="Manage your daily attendance, track working hours, and view attendance history."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span>Download CSV</span>
+            </Button>
+          </div>
+        }
+      />
 
       {/* Summary cards */}
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
