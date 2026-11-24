@@ -227,7 +227,6 @@ function ListTab({ onOpen, onAdd, canCreate }) {
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" onClick={() => downloadCSV('expenses.csv', exportRows(forExport))}>Export{selected.size ? ` (${selected.size})` : ''}</Button>
           <Button size="sm" variant="secondary" onClick={() => window.print()}>Print</Button>
-          {canCreate && <Button size="sm" onClick={onAdd}>+ Add Expense</Button>}
         </div>
       </div>
 
