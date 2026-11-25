@@ -70,6 +70,7 @@ export default function DashboardLayout() {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const profileMenuRef = useRef(null)
   const profilePath = PROFILE_PATHS[user.role] || '/admin/profile'
+  const [tooltip, setTooltip] = useState(null)
 
   // Mobile drawer open state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -87,6 +88,7 @@ export default function DashboardLayout() {
   useEffect(() => {
     setMobileSidebarOpen(false)
     setShowProfileMenu(false)
+    setTooltip(null)
   }, [location.pathname])
 
   // Close profile dropdown on click outside
@@ -112,12 +114,29 @@ export default function DashboardLayout() {
   }, [desktopSidebarOpen])
 
   const toggleSidebar = useCallback(() => {
+    setTooltip(null)
     if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
       setDesktopSidebarOpen((prev) => !prev)
     } else {
       setMobileSidebarOpen((prev) => !prev)
     }
   }, [])
+
+  const isCollapsed = !desktopSidebarOpen
+
+  const handleNavMouseEnter = (e, label) => {
+    if (!isCollapsed || (typeof window !== 'undefined' && window.innerWidth < 1024)) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltip({
+      label,
+      top: rect.top + rect.height / 2,
+      left: rect.right + 10,
+    })
+  }
+
+  const handleNavMouseLeave = () => {
+    if (tooltip) setTooltip(null)
+  }
 
   // Real geofence radius for the Sub-Admin's branch (footer card).
   useEffect(() => {
@@ -172,37 +191,35 @@ export default function DashboardLayout() {
         />
       )}
 
-      {/* Sidebar — static collapsible on desktop, off-canvas drawer on mobile */}
+      {/* Sidebar — collapsible icon rail on desktop, off-canvas drawer on mobile */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-200 bg-white transition-all duration-300 ease-in-out lg:relative lg:z-auto lg:h-screen ${
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${
-          desktopSidebarOpen
-            ? 'w-64'
-            : 'w-64 lg:w-0 lg:border-r-0 lg:overflow-hidden lg:pointer-events-none'
+          desktopSidebarOpen ? 'w-64' : 'w-64 lg:w-[72px]'
         }`}
         aria-label="Sidebar navigation"
       >
-        <div className="flex h-full w-64 shrink-0 flex-col">
-          <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-4">
-            <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex h-full w-full flex-col overflow-hidden">
+          <div className={`flex h-16 shrink-0 items-center border-b border-slate-200 px-4 ${isCollapsed ? 'justify-between lg:justify-center lg:px-2' : 'justify-between'}`}>
+            <div className={`flex items-center gap-2.5 min-w-0 ${isCollapsed ? 'lg:justify-center' : ''}`}>
               {brandLogo && !logoError ? (
                 <img
                   src={getAssetUrl(brandLogo)}
                   alt={brandName}
                   onError={() => setLogoError(true)}
-                  className="h-8 max-h-8 max-w-[120px] object-contain rounded"
+                  className={`h-8 max-h-8 object-contain rounded ${isCollapsed ? 'max-w-[120px] lg:max-w-[44px]' : 'max-w-[120px]'}`}
                 />
               ) : (
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white shadow-sm ring-1 ring-blue-700/20">
                   <span className="material-symbols-outlined text-[20px]">apartment</span>
                 </div>
               )}
-              <div className="flex flex-col min-w-0">
+              <div className={`flex flex-col min-w-0 ${isCollapsed ? 'lg:hidden' : ''}`}>
                 <span className="font-bold text-slate-900 tracking-tight leading-tight text-sm truncate max-w-[125px]">
                   {brandName}
                 </span>
-                <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">
+                <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider truncate">
                   {ROLE_LABELS[user.role]}
                 </span>
               </div>
@@ -216,9 +233,9 @@ export default function DashboardLayout() {
                   setMobileSidebarOpen(false)
                 }
               }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-              title="Hide sidebar"
-              aria-label="Hide sidebar"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition ${isCollapsed ? 'lg:hidden' : ''}`}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
             >
               <span className="hidden lg:inline-flex">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -233,10 +250,11 @@ export default function DashboardLayout() {
           {nav.map((item) => {
             if (item.type === 'group') {
               return (
-                <div key={item.label} className="mt-5 mb-1.5 px-3 first:mt-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                <div key={item.label} className={isCollapsed ? 'mt-5 mb-1.5 px-3 first:mt-1 lg:my-2.5 lg:px-2' : 'mt-5 mb-1.5 px-3 first:mt-1'}>
+                  <span className={`text-[10px] font-semibold uppercase tracking-widest text-slate-400 whitespace-nowrap ${isCollapsed ? 'lg:hidden' : ''}`}>
                     {item.label}
                   </span>
+                  {isCollapsed && <div className="hidden border-t border-slate-200/80 lg:block" />}
                 </div>
               )
             }
@@ -248,21 +266,35 @@ export default function DashboardLayout() {
               return (
                 <div key={item.label} className="mb-1">
                   <button
-                    onClick={() => toggleDropdown(item.label)}
+                    type="button"
+                    onClick={() => {
+                      if (isCollapsed && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                        setDesktopSidebarOpen(true)
+                        setExpandedDropdown(item.label)
+                        setTooltip(null)
+                        return
+                      }
+                      toggleDropdown(item.label)
+                    }}
+                    onMouseEnter={(e) => handleNavMouseEnter(e, item.label)}
+                    onMouseLeave={handleNavMouseLeave}
+                    aria-label={item.label}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+                      isCollapsed ? 'lg:justify-center lg:px-0' : ''
+                    } ${
                       hasActiveChild
                         ? 'bg-blue-50 text-blue-700 font-medium'
                         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                   >
-                    <span className="material-symbols-outlined w-5 text-[20px] leading-none opacity-90">{item.icon}</span>
-                    <span className="flex-1 text-left">{item.label}</span>
-                    <span className="material-symbols-outlined text-[18px] leading-none transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
+                    <span className="material-symbols-outlined w-5 shrink-0 text-[20px] leading-none opacity-90">{item.icon}</span>
+                    <span className={`flex-1 text-left whitespace-nowrap truncate ${isCollapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+                    <span className={`material-symbols-outlined text-[18px] leading-none transition-transform duration-200 ${isCollapsed ? 'lg:hidden' : ''}`} style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>expand_more</span>
                   </button>
                   
                   {/* Accordion content */}
                   <div 
-                    className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0'}`}
+                    className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0'} ${isCollapsed ? 'lg:hidden' : ''}`}
                   >
                     <div className="overflow-hidden">
                       <div className="flex flex-col gap-1 pl-11 pr-3 pb-1">
@@ -290,28 +322,40 @@ export default function DashboardLayout() {
               )
             }
 
+            const hasActionBadge = (item.path === '/sub-admin/action' || item.path === '/admin/action') && actionCount > 0
+
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 end={item.path.split('/').length <= 2}
+                onMouseEnter={(e) => handleNavMouseEnter(e, item.label)}
+                onMouseLeave={handleNavMouseLeave}
+                aria-label={item.label}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+                  `relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+                    isCollapsed ? 'lg:justify-center lg:px-0' : ''
+                  } ${
                     isActive
                       ? 'bg-blue-600 text-white'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`
                 }
               >
-                <span className="material-symbols-outlined w-5 text-[20px] leading-none opacity-90">{item.icon}</span>
-                <span className="flex-1">{item.label}</span>
-                {(item.path === '/sub-admin/action' || item.path === '/admin/action') && actionCount > 0 && (
-                  <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                    {actionCount}
-                  </span>
+                <span className="material-symbols-outlined w-5 shrink-0 text-[20px] leading-none opacity-90">{item.icon}</span>
+                <span className={`flex-1 whitespace-nowrap truncate ${isCollapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+                {hasActionBadge && (
+                  <>
+                    <span className={`rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white ${isCollapsed ? 'lg:hidden' : ''}`}>
+                      {actionCount}
+                    </span>
+                    {isCollapsed && (
+                      <span className="hidden lg:block absolute top-1.5 right-3 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+                    )}
+                  </>
                 )}
                 {item.badge && (
-                  <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] uppercase text-slate-700">
+                  <span className={`rounded bg-slate-200 px-1.5 py-0.5 text-[10px] uppercase text-slate-700 ${isCollapsed ? 'lg:hidden' : ''}`}>
                     {item.badge}
                   </span>
                 )}
@@ -323,64 +367,45 @@ export default function DashboardLayout() {
 
         {/* Branch Admin geofence card (mirrors the prototype's sidebar footer). */}
         {user.role === ROLES.SUB_ADMIN && (
-          <div className="mx-3 mb-1 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className={`mx-3 mb-1 rounded-xl border border-slate-200 bg-slate-50 p-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Current Geofence</div>
-            <div className="mt-0.5 text-sm font-semibold text-slate-800">{user.branch || 'Unassigned branch'}</div>
+            <div className="mt-0.5 text-sm font-semibold text-slate-800 truncate">{user.branch || 'Unassigned branch'}</div>
             <div className="text-xs font-medium text-blue-600">Radius: {geofenceRadius}m Active</div>
           </div>
         )}
 
-        <div className="border-t border-slate-200 p-4 text-xs text-slate-500">
+        <div className={`border-t border-slate-200 p-4 text-xs text-slate-500 whitespace-nowrap truncate ${isCollapsed ? 'lg:hidden' : ''}`}>
           {ROLE_LABELS[user.role]}
         </div>
         </div>
       </aside>
 
+      {/* Hover tooltip for collapsed desktop sidebar */}
+      {tooltip && isCollapsed && (
+        <div
+          className="pointer-events-none fixed z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg lg:block"
+          style={{ top: tooltip.top, left: tooltip.left }}
+          role="tooltip"
+        >
+          {tooltip.label}
+        </div>
+      )}
+
       {/* Main */}
       <div className="flex flex-1 flex-col min-w-0 h-screen overflow-hidden">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 z-20 shadow-sm">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={toggleSidebar}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:bg-slate-200"
-              title={desktopSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-              aria-label={desktopSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+              title={desktopSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              aria-label={desktopSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-
-            {/* Application Branding & Logo */}
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              {brandLogo && !logoError ? (
-                <img
-                  src={getAssetUrl(brandLogo)}
-                  alt={brandName}
-                  onError={() => setLogoError(true)}
-                  className="h-8 max-h-8 max-w-[130px] sm:max-w-[170px] object-contain rounded-md"
-                />
-              ) : (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white shadow-sm ring-1 ring-blue-700/20">
-                  <span className="material-symbols-outlined text-[20px]">apartment</span>
-                </div>
-              )}
-
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-900 text-sm tracking-tight truncate max-w-[140px] sm:max-w-[240px]">
-                    {brandName}
-                  </span>
-                  <span className="hidden sm:inline-block rounded-md bg-blue-50 border border-blue-200/80 px-2 py-0.5 text-[10px] font-semibold text-blue-700 uppercase tracking-wider">
-                    {ROLE_LABELS[user.role]}
-                  </span>
-                </div>
-                <span className="text-[11px] text-slate-500 font-medium truncate sm:hidden">
-                  {ROLE_LABELS[user.role]} Workspace
-                </span>
-              </div>
-            </div>
           </div>
           <div className="flex items-center gap-4">
             <NotificationBell />
