@@ -91,8 +91,13 @@ function CreateModal({ role, onClose, onDone }) {
     }
     setBusy(true)
     try {
-      await usersApi.create({ ...form, password: form.password || undefined })
-      toast.success('User created (activation email sent)')
+      const res = await usersApi.create({ ...form, password: form.password || undefined })
+      const data = res.data?.data
+      if (data?.emailSent) {
+        toast.success(`User created! Invitation email sent to ${form.email}`)
+      } else {
+        toast.warning(`User created, but invitation email was not sent: ${data?.emailMessage || 'Check Office Settings → Email & SMTP Settings.'}`, { autoClose: 6000 })
+      }
       onDone()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed')

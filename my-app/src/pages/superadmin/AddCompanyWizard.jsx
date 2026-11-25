@@ -23,6 +23,7 @@ export default function AddCompanyWizard({ onClose, onDone }) {
     logo: '',
     name: '',
     contactEmail: '',
+    officialEmail: '',
     contactPhone: '',
     website: '',
     gstNumber: '',
@@ -58,6 +59,7 @@ export default function AddCompanyWizard({ onClose, onDone }) {
       const payload = {
         name: form.name,
         contactEmail: form.contactEmail,
+        officialEmail: form.officialEmail?.trim() || form.contactEmail?.trim(),
         contactPhone: form.contactPhone,
         logo: form.logo,
         website: form.website,
@@ -127,6 +129,7 @@ export default function AddCompanyWizard({ onClose, onDone }) {
         <Input label="Company Name *" value={form.name} onChange={setF('name')} placeholder="e.g. Acme Corp" />
         <Input label="Company Logo (URL)" value={form.logo} onChange={setF('logo')} placeholder="https://..." />
         <Input label="Company Email *" type="email" value={form.contactEmail} onChange={setF('contactEmail')} />
+        <Input label="Company Official Email (Default Sender)" type="email" value={form.officialEmail} onChange={setF('officialEmail')} placeholder="e.g. notifications@acmecorp.com" />
         <Input label="Mobile Number *" value={form.contactPhone} onChange={setF('contactPhone')} />
         <Input label="Website" value={form.website} onChange={setF('website')} />
         <Input label="GST Number" value={form.gstNumber} onChange={setF('gstNumber')} />

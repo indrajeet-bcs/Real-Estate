@@ -46,6 +46,8 @@ export const env = {
     pass: process.env.EMAIL_PASS || process.env.SMTP_PASS || '',
     from: process.env.EMAIL_FROM || process.env.SMTP_FROM || 'Real Estate CRM <thoratindrajeet30@gmail.com>',
   },
+
+  smtpEncryptionKey: process.env.SMTP_ENCRYPTION_KEY || '15f232881a5f79b410a419d41a0b08b31fb12dcbbc159bd8ca6826ee157c98c6',
 }
 
 export const isProd = env.nodeEnv === 'production'

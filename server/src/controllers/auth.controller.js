@@ -89,6 +89,9 @@ export const login = asyncHandler(async (req, res) => {
   if (!user.isActive) {
     throw ApiError.forbidden('Account is inactive. Please contact your admin.')
   }
+  if (user.status === 'pending') {
+    throw ApiError.forbidden('Your account is pending activation. Please accept the invitation and set your password using the link sent to your email.')
+  }
 
   const accessToken = await issueTokens(res, user, {
     lastLoginAt: new Date(),
@@ -340,4 +343,121 @@ export const changePassword = asyncHandler(async (req, res) => {
   writeAudit({ req, action: AUDIT_ACTIONS.UPDATE, module: 'user', targetId: user._id, targetLabel: user.name, description: 'Changed own password' })
   clearRefreshCookie(res)
   return ok(res, null, 'Password changed. Please log in again.')
+})
+
+// GET /api/auth/verify-invitation?token=TOKEN
+export const verifyInvitation = asyncHandler(async (req, res) => {
+  const rawToken = String(req.query.token || '').trim()
+  if (!rawToken) {
+    throw ApiError.badRequest('Invitation token is required')
+  }
+
+  const tokenHash = hashToken(rawToken)
+  const user = await User.findOne({ invitationTokenHash: tokenHash })
+    .select('+invitationTokenHash +invitationTokenExpires')
+    .populate('firm', 'name logo officialEmail')
+
+  if (!user) {
+    throw ApiError.badRequest('Invalid or expired invitation link')
+  }
+
+  if (user.status === 'active' && !user.invitationTokenExpires) {
+    return ok(res, {
+      valid: false,
+      alreadyActive: true,
+      message: 'This invitation has already been accepted and the account is active. Please log in.',
+    }, 'Invitation already accepted')
+  }
+
+  if (!user.invitationTokenExpires || user.invitationTokenExpires.getTime() < Date.now()) {
+    throw ApiError.badRequest('This invitation has expired. Please contact your administrator to resend the invitation.')
+  }
+
+  return ok(res, {
+    valid: true,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    employeeId: user.employeeId || '',
+    firmName: user.firm?.name || 'Real Estate CRM',
+    firmLogo: user.firm?.logo || null,
+    expiresAt: user.invitationTokenExpires,
+  }, 'Invitation verified successfully')
+})
+
+// POST /api/auth/accept-invitation
+export const acceptInvitation = asyncHandler(async (req, res) => {
+  const { token, password } = req.body
+  const rawToken = String(token || '').trim()
+  if (!rawToken) {
+    throw ApiError.badRequest('Invitation token is required')
+  }
+
+  const tokenHash = hashToken(rawToken)
+
+  const user = await User.findOne({
+    invitationTokenHash: tokenHash,
+  })
+    .select('+invitationTokenHash +invitationTokenExpires +password +refreshTokens')
+    .populate('customRole')
+    .populate('firm', 'name logo')
+
+  if (!user) {
+    throw ApiError.badRequest('Invalid, expired, or already-used invitation token')
+  }
+
+  if (user.status === 'active' && !user.invitationTokenExpires) {
+    throw ApiError.badRequest('This invitation has already been accepted and the account is active. Please log in.')
+  }
+
+  if (!user.invitationTokenExpires || user.invitationTokenExpires.getTime() < Date.now()) {
+    throw ApiError.badRequest('This invitation has expired. Please contact your administrator to resend the invitation.')
+  }
+
+  // Atomically claim the invitation to prevent simultaneous replay attacks
+  const claimed = await User.findOneAndUpdate(
+    { _id: user._id, invitationTokenHash: tokenHash, status: { $ne: 'active' } },
+    {
+      $unset: { invitationTokenHash: 1, invitationTokenExpires: 1, resetOtpHash: 1, resetOtpExpires: 1 },
+      $set: { status: 'active', isActive: true, mustSetPassword: false, invitationAcceptedAt: new Date() },
+    },
+    { new: true }
+  )
+
+  if (!claimed) {
+    throw ApiError.badRequest('Invitation token has already been claimed or is no longer valid')
+  }
+
+  // Update password through model instance so bcrypt hash hook runs reliably
+  user.password = password
+  user.status = 'active'
+  user.isActive = true
+  user.mustSetPassword = false
+  user.invitationTokenHash = undefined
+  user.invitationTokenExpires = undefined
+  user.invitationAcceptedAt = new Date()
+  user.passwordChangedAt = new Date()
+  user.refreshTokens = []
+  await user.save()
+
+  // Issue session tokens and log them in directly
+  const accessToken = await issueTokens(res, user, {
+    lastLoginAt: new Date(),
+    lastLoginDevice: (req.headers['user-agent'] || '').slice(0, 200),
+  })
+
+  writeAudit({
+    req: { ...req, user },
+    action: AUDIT_ACTIONS.UPDATE,
+    module: 'user',
+    targetId: user._id,
+    targetLabel: user.name,
+    description: 'Accepted employee invitation and set permanent password',
+  })
+
+  return ok(res, {
+    accessToken,
+    user: user.toJSON(),
+    permissions: effectivePermissions(user),
+  }, 'Account activated successfully! Welcome to your dashboard.')
 })

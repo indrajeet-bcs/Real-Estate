@@ -15,8 +15,31 @@ async function myBranch(user) {
 }
 
 // GET /api/branch-settings — the Sub-Admin's own branch preferences.
+// Returns an unassigned placeholder (200 OK) when the actor has no branch yet
+// instead of failing with a 400 error on dashboard mount.
 export const getMyBranchSettings = asyncHandler(async (req, res) => {
-  const branch = await myBranch(req.user)
+  if (!req.user.branch) {
+    return ok(res, {
+      unassigned: true,
+      name: null,
+      geofenceRadius: 200,
+      workingHours: '09:00 - 18:00',
+      autoRouteLeads: false,
+    }, 'No branch assigned yet')
+  }
+
+  const branch = await Branch.findOne({ ...firmScope(req.user), name: req.user.branch })
+  if (!branch) {
+    return ok(res, {
+      unassigned: true,
+      missingRecord: true,
+      name: req.user.branch,
+      geofenceRadius: 200,
+      workingHours: '09:00 - 18:00',
+      autoRouteLeads: false,
+    }, 'Branch settings record not found yet')
+  }
+
   return ok(res, branch, 'Branch settings fetched')
 })
 

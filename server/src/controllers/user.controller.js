@@ -9,7 +9,7 @@ import SiteVisit from '../models/SiteVisit.js'
 import AuditLog from '../models/AuditLog.js'
 import crypto from 'crypto'
 import { generateOtp, hashToken } from '../utils/token.js'
-import { sendNewUserInviteEmail } from '../utils/email.js'
+import { sendNewUserInviteEmail, sendCompanyInvitationEmail } from '../utils/email.js'
 import { env, isProd } from '../config/env.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
@@ -155,10 +155,12 @@ export const getUser = asyncHandler(async (req, res) => {
 
     Attendance.aggregate([
       { $match: { user: uid, date: { $gte: attCutoff } } },
-      { $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-      } },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        }
+      },
     ]),
     Booking.find({ bookedBy: uid }).distinct('project'),
     AuditLog.find({ $or: [{ actor: uid }, { targetId: uid }] }).sort({ createdAt: -1 }).limit(12).lean(),
@@ -246,8 +248,9 @@ export const createUser = asyncHandler(async (req, res) => {
     employeeId = `EMP-${String(count + 1).padStart(4, '0')}`
   }
 
-  // Generate One-Time Password (OTP) for account activation
+  // Generate One-Time Password (OTP) and cryptographically secure invitation token
   const otp = generateOtp()
+  const invitationToken = crypto.randomBytes(32).toString('hex')
   const tempPassword = req.body.password && req.body.password.length >= 8
     ? req.body.password
     : crypto.randomBytes(16).toString('hex') + 'A1!'
@@ -262,6 +265,7 @@ export const createUser = asyncHandler(async (req, res) => {
 
   const user = await User.create({
     ...req.body,
+    branch: req.body.branch?.trim() || undefined,
     email: cleanEmail,
     password: tempPassword,
     employeeId,
@@ -271,33 +275,37 @@ export const createUser = asyncHandler(async (req, res) => {
     role,
     // Executives created by a sub-admin report to that sub-admin by default.
     manager: req.body.manager || (req.user.role === ROLES.SUB_ADMIN ? req.user._id : undefined),
+    status: 'pending',
     isActive: true,
     createdBy: req.user._id,
     resetOtpHash: hashToken(otp),
-    resetOtpExpires: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours for new user activation
+    resetOtpExpires: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours for fallback OTP
+    invitationTokenHash: hashToken(invitationToken),
+    invitationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours per spec
+    invitationSentAt: new Date(),
     mustSetPassword: true,
   })
 
-  // Prepare activation / setup link
+  // Prepare invitation / setup link
   const clientBaseUrl = req.headers.origin || env.clientUrl || (isProd ? 'https://real-estate-gamma-flame-64.vercel.app' : 'http://localhost:5173')
-  const setupLink = `${clientBaseUrl.replace(/\/+$/, '')}/set-password?email=${encodeURIComponent(user.email)}&otp=${otp}`
+  const setupLink = `${clientBaseUrl.replace(/\/+$/, '')}/set-password?token=${invitationToken}`
 
-  // Send the Welcome & One-Time Password email
+  // Send the Company Invitation Email using company SMTP configuration
   let emailResult = { sent: false }
   try {
-    emailResult = await sendNewUserInviteEmail({
+    emailResult = await sendCompanyInvitationEmail({
+      firmId: user.firm,
       to: user.email,
       name: user.name,
       role: user.role,
-      email: user.email,
       employeeId: user.employeeId,
-      otp,
+      invitationToken,
       setupLink,
-      firmName: req.user.firm?.name,
     })
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error('[user.controller] Failed to send new user invite email:', err.message)
+    console.error('[user.controller] Failed to send company invitation email:', err.message)
+    emailResult = { sent: false, error: err.message, message: 'Failed to deliver invitation email' }
   }
 
   writeAudit({
@@ -306,17 +314,23 @@ export const createUser = asyncHandler(async (req, res) => {
     module: MODULES.USER,
     targetId: user._id,
     targetLabel: user.name,
-    description: `Created ${role} ${user.email} (Invite OTP sent: ${emailResult.sent ? 'Yes' : 'No'})`,
+    description: `Created ${role} ${user.email} (Invitation sent: ${emailResult.sent ? 'Yes' : 'No'})`,
   })
 
   const responseData = {
     ...user.toJSON(),
+    status: user.status,
     emailSent: Boolean(emailResult.sent),
-    // Provide devOtp and setupLink in development or when email fails so admin can see/copy it
-    ...((!isProd || !emailResult.sent) ? { devOtp: otp, setupLink } : {}),
+    emailMessage: emailResult.message || (emailResult.sent ? 'Invitation email sent successfully' : 'Company SMTP configuration required or delivery failed'),
+    // Provide invitation token and setup link in development or when email fails so admin can see/copy it
+    ...((!isProd || !emailResult.sent) ? { devInvitationToken: invitationToken, devOtp: otp, setupLink } : {}),
   }
 
-  return created(res, responseData, 'User created and one-time password email sent successfully')
+  const message = emailResult.sent
+    ? 'User created and invitation email sent successfully'
+    : 'User created. Note: Invitation email could not be delivered (Company SMTP configuration required or failed).'
+
+  return created(res, responseData, message)
 })
 
 // PATCH /api/users/:id
@@ -573,3 +587,72 @@ export const activateUser = asyncHandler(async (req, res) => {
   })
   return ok(res, target, 'User activated')
 })
+
+// POST /api/users/:id/resend-invitation
+export const resendInvitation = asyncHandler(async (req, res) => {
+  const target = await User.findOne({ _id: req.params.id, ...firmScope(req.user) })
+  if (!target) throw ApiError.notFound('User not found')
+
+  if (ROLE_RANK[req.user.role] <= ROLE_RANK[target.role]) {
+    throw ApiError.forbidden('Cannot manage a user at or above your role')
+  }
+
+  if (target.status === 'active' && !target.mustSetPassword) {
+    throw ApiError.badRequest('Employee has already activated their account and set their password')
+  }
+
+  // Generate new 24-hour invitation token
+  const invitationToken = crypto.randomBytes(32).toString('hex')
+  target.invitationTokenHash = hashToken(invitationToken)
+  target.invitationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  target.invitationSentAt = new Date()
+  target.status = 'pending'
+  target.mustSetPassword = true
+  await target.save()
+
+  const clientBaseUrl = req.headers.origin || env.clientUrl || (isProd ? 'https://real-estate-gamma-flame-64.vercel.app' : 'http://localhost:5173')
+  const setupLink = `${clientBaseUrl.replace(/\/+$/, '')}/set-password?token=${invitationToken}`
+
+  let emailResult = { sent: false }
+  try {
+    emailResult = await sendCompanyInvitationEmail({
+      firmId: target.firm,
+      to: target.email,
+      name: target.name,
+      role: target.role,
+      employeeId: target.employeeId,
+      invitationToken,
+      setupLink,
+    })
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[user.controller] Failed to resend company invitation email:', err.message)
+    emailResult = { sent: false, error: err.message, message: 'Failed to deliver invitation email' }
+  }
+
+  writeAudit({
+    req,
+    action: AUDIT_ACTIONS.UPDATE,
+    module: MODULES.USER,
+    targetId: target._id,
+    targetLabel: target.name,
+    description: `Resent invitation to ${target.email} (Email sent: ${emailResult.sent ? 'Yes' : 'No'})`,
+  })
+
+  const responseData = {
+    _id: target._id,
+    email: target.email,
+    name: target.name,
+    status: target.status,
+    emailSent: Boolean(emailResult.sent),
+    emailMessage: emailResult.message || (emailResult.sent ? 'Invitation email resent successfully' : 'Company SMTP configuration required or delivery failed'),
+    ...((!isProd || !emailResult.sent) ? { devInvitationToken: invitationToken, setupLink } : {}),
+  }
+
+  const message = emailResult.sent
+    ? 'Invitation email resent successfully'
+    : 'Invitation reset. Note: Email could not be sent (Company SMTP configuration required or failed).'
+
+  return ok(res, responseData, message)
+})
+

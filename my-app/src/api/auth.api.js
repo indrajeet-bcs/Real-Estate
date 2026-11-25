@@ -12,4 +12,6 @@ export const authApi = {
   resetPassword: (payload) => api.post('/auth/reset-password', payload),
   setPassword: (payload) => api.post('/auth/set-password', payload),
   changePassword: (payload) => api.post('/auth/change-password', payload),
+  verifyInvitation: (token) => api.get(`/auth/verify-invitation?token=${encodeURIComponent(token)}`),
+  acceptInvitation: (payload) => api.post('/auth/accept-invitation', payload),
 }

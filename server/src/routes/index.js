@@ -34,6 +34,7 @@ import loanRoutes from './loan.routes.js'
 import roleRoutes from './role.routes.js'
 import registrationRoutes from './registration.routes.js'
 import possessionRoutes from './possession.routes.js'
+import companySmtpRoutes from './companySmtp.routes.js'
 import {
   companyPreferencesRouter, companyBusinessConfigRouter, companyNotificationsRouter,
   companySecurityRouter, companyBrandingRouter, masterDataRouter, activeSessionsRouter,
@@ -87,5 +88,6 @@ router.use('/company-security', companySecurityRouter)
 router.use('/company-branding', companyBrandingRouter)
 router.use('/master-data', masterDataRouter)
 router.use('/active-sessions', activeSessionsRouter)
+router.use('/company-smtp', companySmtpRoutes)
 
 export default router

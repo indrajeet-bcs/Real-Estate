@@ -216,10 +216,15 @@ export default function UserRegistrationModal({
         }
         const res = await usersApi.create(payload)
         const data = res.data?.data || res.data
-        if (data?.devOtp) {
-          toast.success(`User ${form.name} registered! One-Time Password email sent. (Dev OTP: ${data.devOtp})`)
+        if (data?.emailSent) {
+          toast.success(`User ${form.name} registered! Invitation email sent to ${form.email}.`)
+        } else if (data?.emailMessage || data?.setupLink) {
+          toast.warning(
+            `User ${form.name} registered, but invitation email was not sent: ${data.emailMessage || 'Please check Office Settings → Email & SMTP Settings.'}`,
+            { autoClose: 6000 }
+          )
         } else {
-          toast.success(`User ${form.name} registered! An activation email with a One-Time Password has been sent to ${form.email}.`)
+          toast.success(`User ${form.name} registered successfully!`)
         }
         onDone?.(data)
       } else {
@@ -506,7 +511,7 @@ export default function UserRegistrationModal({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-700">
-                Assigned Branch <span className="text-red-500">*</span>
+                Assigned Branch <span className="font-normal text-slate-400">(Optional)</span>
               </label>
               <Select
                 value={form.branch}

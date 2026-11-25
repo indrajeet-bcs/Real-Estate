@@ -65,6 +65,26 @@ function Preferences() {
   if (loading || (!form && !error)) return <Loader />
   if (error) return <ErrorState message={error} onRetry={refetch} />
 
+  if (data?.unassigned) {
+    return (
+      <Card className="max-w-xl p-6">
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <span className="material-symbols-outlined shrink-0 text-[20px] text-amber-600">info</span>
+          <div>
+            <p className="font-semibold text-amber-900">
+              {data.missingRecord ? `Branch "${data.name}" has no settings record yet` : 'No Branch Assigned'}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-700">
+              {data.missingRecord
+                ? 'Ask your Company Admin to create this branch under Branches Management before configuring branch preferences.'
+                : 'You are not assigned to a branch yet. Contact your Company Admin to assign you to a branch before configuring geofence radius, working hours, or lead auto-routing.'}
+            </p>
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
   return (
     <Card className="max-w-xl p-6">
       <div className="text-sm font-semibold text-slate-700">{data.name}{data.region ? ` · ${data.region}` : ''}</div>

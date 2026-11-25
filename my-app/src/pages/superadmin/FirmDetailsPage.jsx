@@ -121,6 +121,7 @@ export default function FirmDetailsPage() {
     setEditForm({
       name: firm.name || '',
       contactEmail: firm.contactEmail || '',
+      officialEmail: firm.officialEmail || '',
       contactPhone: firm.contactPhone || '',
       region: firm.region || '',
     })
@@ -176,6 +177,8 @@ export default function FirmDetailsPage() {
               <Field label="Company Name" value={firm.name} />
               <Field label="Company ID" value={firm.companyId || firm._id.substring(firm._id.length-6)} />
               <Field label="Company Email" value={firm.contactEmail} />
+              <Field label="Official Sender Email" value={firm.officialEmail || firm.contactEmail || '—'} />
+              <Field label="SMTP Email Status" value={firm.smtpConfig?.isVerified ? 'Verified & Active' : firm.smtpConfig?.isConfigured ? 'Verification Pending' : 'Not Configured'} />
               <Field label="Mobile Number" value={firm.contactPhone} />
               <Field label="Business Address" value={firm.region || '—'} />
               <Field label="City" value={firm.branches?.[0] || '—'} />
@@ -413,6 +416,12 @@ export default function FirmDetailsPage() {
               label="Contact Email" 
               value={editForm.contactEmail}
               onChange={(e) => setEditForm(prev => ({ ...prev, contactEmail: e.target.value }))}
+            />
+            <Input 
+              label="Official Sender Email" 
+              value={editForm.officialEmail}
+              onChange={(e) => setEditForm(prev => ({ ...prev, officialEmail: e.target.value }))}
+              placeholder="e.g. notifications@company.com"
             />
             <Input 
               label="Contact Phone" 

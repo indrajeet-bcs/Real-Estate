@@ -13,6 +13,20 @@ const firmSchema = new Schema(
     branches: [{ type: String, trim: true }],
     contactEmail: { type: String, trim: true, lowercase: true },
     contactPhone: { type: String, trim: true },
+
+    // Company Official Email & Multi-Company SMTP Configuration
+    officialEmail: { type: String, trim: true, lowercase: true },
+    smtpConfig: {
+      fromName: { type: String, trim: true, default: '' },
+      host: { type: String, trim: true, default: '' },
+      port: { type: Number, default: 587 },
+      secure: { type: Boolean, default: false },
+      username: { type: String, trim: true, default: '' },
+      passwordEncrypted: { type: String, select: false, default: '' },
+      isConfigured: { type: Boolean, default: false },
+      isVerified: { type: Boolean, default: false },
+      lastVerifiedAt: { type: Date },
+    },
     
     // Step 1: Extra Info
     logo: { type: String, trim: true },

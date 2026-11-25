@@ -26,7 +26,15 @@ export const createFirm = asyncHandler(async (req, res) => {
   const emailTaken = await User.findOne({ email: admin.email })
   if (emailTaken) throw ApiError.conflict('An account with that admin email already exists')
 
-  const firm = await Firm.create({ ...firmData, createdBy: req.user._id })
+  const officialEmail = firmData.officialEmail
+    ? firmData.officialEmail.trim().toLowerCase()
+    : (firmData.contactEmail ? firmData.contactEmail.trim().toLowerCase() : admin.email.trim().toLowerCase())
+
+  const firm = await Firm.create({
+    ...firmData,
+    officialEmail,
+    createdBy: req.user._id,
+  })
   let adminUser
   try {
     adminUser = await User.create({

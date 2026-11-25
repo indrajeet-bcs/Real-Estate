@@ -7,6 +7,7 @@ import SecuritySettingsTab from './SecuritySettingsTab.jsx'
 import MasterDataTab from './MasterDataTab.jsx'
 import BrandingSettingsTab from './BrandingSettingsTab.jsx'
 import BusinessConfigTab from './BusinessConfigTab.jsx'
+import CompanySmtpSettingsTab from './CompanySmtpSettingsTab.jsx'
 
 function NavItem({ icon, label, active, onClick }) {
   return (
@@ -80,6 +81,12 @@ export default function OfficeSettingsPage() {
               active={activeTab === 'branding'} 
               onClick={() => setActiveTab('branding')} 
             />
+            <NavItem 
+              icon="mail" 
+              label="Email & SMTP Settings" 
+              active={activeTab === 'smtp'} 
+              onClick={() => setActiveTab('smtp')} 
+            />
           </nav>
         </div>
 
@@ -92,6 +99,7 @@ export default function OfficeSettingsPage() {
           {activeTab === 'security' && <SecuritySettingsTab />}
           {activeTab === 'masterdata' && <MasterDataTab />}
           {activeTab === 'branding' && <BrandingSettingsTab />}
+          {activeTab === 'smtp' && <CompanySmtpSettingsTab />}
         </div>
       </div>
     </div>

@@ -32,6 +32,14 @@ export const usersApi = {
   deactivate: (id, reassignTo) => api.patch(`/users/${id}/deactivate`, { reassignTo }),
   activate: (id) => api.patch(`/users/${id}/activate`),
   transfer: (id, body) => api.patch(`/users/${id}/transfer`, body),
+  resendInvitation: (id) => api.post(`/users/${id}/resend-invitation`),
+}
+
+export const companySmtpApi = {
+  get: (firmId) => api.get(`/company-smtp${firmId ? `?firmId=${firmId}` : ''}`),
+  update: (data) => api.patch('/company-smtp', data),
+  testConnection: (data) => api.post('/company-smtp/test-connection', data),
+  sendTestEmail: (data) => api.post('/company-smtp/send-test-email', data),
 }
 
 export const branchesApi = {

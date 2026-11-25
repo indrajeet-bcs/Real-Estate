@@ -23,6 +23,7 @@ const ICONS = {
   eye: (<><path d="M2.036 12.322a1.012 1.012 0 0 1 0-.644C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.01 9.963 7.178.07.207.07.43 0 .644C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.01-9.963-7.178Z" /><path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></>),
   pencil: (<path d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />),
   transfer: (<path d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-9L21 7.5m0 0L16.5 3m4.5 4.5H7.5" />),
+  mail: (<path d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />),
   power: (<path d="M5.636 5.636a9 9 0 1 0 12.728 0M12 3v9" />),
   trash: (<><path d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></>),
 }
@@ -138,7 +139,8 @@ function RosterTab() {
     if (q) out = out.filter((u) => [u.name, u.employeeId, u.email, u.phone].some((v) => (v || '').toLowerCase().includes(q)))
     if (filters.branch) out = out.filter((u) => u.branch === filters.branch)
     if (filters.subAdmin) out = out.filter((u) => String(u.manager?._id || u.manager) === filters.subAdmin)
-    if (filters.status === 'active') out = out.filter((u) => u.isActive)
+    if (filters.status === 'active') out = out.filter((u) => u.isActive && u.status !== 'pending')
+    if (filters.status === 'pending') out = out.filter((u) => u.status === 'pending' || u.mustSetPassword)
     if (filters.status === 'disabled') out = out.filter((u) => !u.isActive)
     if (filters.status === 'transferred') out = out.filter((u) => (u.transferCount || 0) > 0)
     if (filters.performance !== 'all') out = out.filter((u) => perfTier(u.targetProgressPct) === filters.performance)
@@ -156,6 +158,29 @@ function RosterTab() {
       refetch()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed (employee may hold open leads — reassign first)')
+    }
+  }
+
+  async function handleResendInvitation(u) {
+    try {
+      const res = await usersApi.resendInvitation(u._id)
+      const data = res.data?.data
+      if (data?.emailSent) {
+        toast.success(`Invitation email resent to ${u.email}`)
+      } else {
+        toast.warning(data?.emailMessage || res.data?.message || 'Invitation reset, but email delivery failed (check Office Settings → Email & SMTP Settings).', { autoClose: 5000 })
+        if (data?.setupLink) {
+          try {
+            await navigator.clipboard?.writeText(data.setupLink)
+            toast.info('Setup link copied to clipboard!')
+          } catch {
+            // ignore clipboard errors
+          }
+        }
+      }
+      refetch()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to resend invitation')
     }
   }
 
@@ -198,10 +223,31 @@ function RosterTab() {
         ? <button onClick={(e) => { e.stopPropagation(); setHistoryFor(r) }} className="text-xs font-medium text-blue-600 hover:underline">Transferred {r.transferCount}×</button>
         : <span className="text-xs text-slate-400">Never</span>
     ) },
-    { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.isActive ? 'approved' : 'cancelled'} /> },
+    { key: 'status', header: 'Status', render: (r) => {
+      if (r.status === 'pending' || r.mustSetPassword) {
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Invitation Pending
+          </span>
+        )
+      }
+      return <StatusBadge status={r.isActive ? 'approved' : 'cancelled'} />
+    } },
     { key: 'actions', header: '', render: (r) => (
       <div className="flex justify-end gap-1.5">
         <IconBtn title="View" onClick={(e) => { e.stopPropagation(); navigate(`/admin/employees/${r._id}`) }} icon={ICONS.eye} />
+        {can('user', 'edit') && (r.status === 'pending' || r.mustSetPassword) && (
+          <IconBtn
+            title="Resend Invitation Email"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleResendInvitation(r)
+            }}
+            icon={ICONS.mail}
+            tone="slate"
+          />
+        )}
         {can('user', 'edit') && <IconBtn title="Edit" onClick={(e) => { e.stopPropagation(); setEditFor(r) }} icon={ICONS.pencil} />}
         {can('user', 'edit') && <IconBtn title="Transfer" onClick={(e) => { e.stopPropagation(); setTransferFor(r) }} icon={ICONS.transfer} />}
         {can('user', 'edit') && <IconBtn title={r.isActive ? 'Disable' : 'Enable'} tone={r.isActive ? 'danger' : 'success'} onClick={(e) => { e.stopPropagation(); r.isActive ? setDisableFor(r) : toggleActive(r) }} icon={ICONS.power} />}
@@ -247,6 +293,7 @@ function RosterTab() {
             <Select label="Employee Status" value={filters.status} onChange={setF('status')}>
               <option value="all">All</option>
               <option value="active">Active</option>
+              <option value="pending">Invitation Pending</option>
               <option value="disabled">Disabled</option>
               <option value="transferred">Transferred</option>
             </Select>
@@ -356,7 +403,7 @@ export function EmployeeModal({ user, branches = [], subAdmins = [], onClose, on
     setBusy(true)
     try {
       if (isNew) {
-        await usersApi.create({
+        const res = await usersApi.create({
           name: form.name,
           email: form.email,
           password: form.password || undefined,
@@ -370,7 +417,12 @@ export function EmployeeModal({ user, branches = [], subAdmins = [], onClose, on
           targetSales: Number(form.targetSales) || 0,
           joiningDate: form.joiningDate || undefined,
         })
-        toast.success('Employee created successfully (activation email sent)')
+        const data = res.data?.data
+        if (data?.emailSent) {
+          toast.success(`Employee created and invitation email sent to ${form.email}`)
+        } else {
+          toast.warning(`Employee created, but invitation email was not sent: ${data?.emailMessage || 'Check Office Settings → Email & SMTP Settings.'}`, { autoClose: 6000 })
+        }
       } else {
         await usersApi.update(user._id, {
           name: form.name,

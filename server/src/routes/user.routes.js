@@ -31,6 +31,7 @@ router.patch(
   userCtrl.deactivateUser
 )
 router.patch('/:id/activate', requirePermission(MODULES.USER, 'edit'), userCtrl.activateUser)
+router.post('/:id/resend-invitation', requirePermission(MODULES.USER, 'edit'), userCtrl.resendInvitation)
 router.patch('/:id/transfer', validate(transferUserSchema), requirePermission(MODULES.USER, 'edit'), userCtrl.transferUser)
 router.delete('/:id', requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN), requirePermission(MODULES.USER, 'delete'), validate(deleteUserSchema), userCtrl.deleteUser)
 

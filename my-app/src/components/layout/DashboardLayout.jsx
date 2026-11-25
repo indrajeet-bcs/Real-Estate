@@ -140,13 +140,13 @@ export default function DashboardLayout() {
 
   // Real geofence radius for the Sub-Admin's branch (footer card).
   useEffect(() => {
-    if (user.role !== ROLES.SUB_ADMIN && user.role !== ROLES.ADMIN) return undefined
+    if (user.role !== ROLES.SUB_ADMIN || !user.branch) return undefined
     let active = true
     branchSettingsApi.get()
       .then((res) => { if (active && res.data.data?.geofenceRadius) setGeofenceRadius(res.data.data.geofenceRadius) })
       .catch(() => {})
     return () => { active = false }
-  }, [user.role])
+  }, [user.role, user.branch])
 
   // Live pending-approvals count for the Sub-Admin Action Center badge.
   useEffect(() => {
@@ -370,7 +370,9 @@ export default function DashboardLayout() {
           <div className={`mx-3 mb-1 rounded-xl border border-slate-200 bg-slate-50 p-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Current Geofence</div>
             <div className="mt-0.5 text-sm font-semibold text-slate-800 truncate">{user.branch || 'Unassigned branch'}</div>
-            <div className="text-xs font-medium text-blue-600">Radius: {geofenceRadius}m Active</div>
+            <div className="text-xs font-medium text-blue-600">
+              {user.branch ? `Radius: ${geofenceRadius}m Active` : 'No branch assigned'}
+            </div>
           </div>
         )}
 

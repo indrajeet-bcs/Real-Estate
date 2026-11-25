@@ -8,6 +8,7 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  acceptInvitationSchema,
   changePasswordSchema,
   updateProfileSchema,
 } from '../validators/auth.validators.js'
@@ -29,6 +30,8 @@ router.post('/logout', authCtrl.logout)
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), authCtrl.forgotPassword)
 router.post('/reset-password', authLimiter, validate(resetPasswordSchema), authCtrl.resetPassword)
 router.post('/set-password', authLimiter, validate(resetPasswordSchema), authCtrl.setPassword)
+router.get('/verify-invitation', authLimiter, authCtrl.verifyInvitation)
+router.post('/accept-invitation', authLimiter, validate(acceptInvitationSchema), authCtrl.acceptInvitation)
 
 router.get('/me', authenticate, authCtrl.me)
 router.patch('/profile', authenticate, validate(updateProfileSchema), authCtrl.updateMyProfile)

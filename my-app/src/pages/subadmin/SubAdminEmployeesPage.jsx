@@ -349,9 +349,18 @@ function EmployeeModal({ user, onClose, onDone }) {
     }
     setBusy(true)
     try {
-      if (isNew) await usersApi.create({ ...form, password: form.password || undefined, role: 'sales_executive' })
-      else await usersApi.update(user._id, { name: form.name, phone: form.phone, designation: form.designation, branch: form.branch })
-      toast.success(isNew ? 'Employee created (activation email sent)' : 'Employee updated')
+      if (isNew) {
+        const res = await usersApi.create({ ...form, password: form.password || undefined, role: 'sales_executive' })
+        const data = res.data?.data
+        if (data?.emailSent) {
+          toast.success(`Employee created! Invitation email sent to ${form.email}`)
+        } else {
+          toast.warning(`Employee created, but invitation email was not sent: ${data?.emailMessage || 'Check Office Settings → Email & SMTP Settings.'}`, { autoClose: 6000 })
+        }
+      } else {
+        await usersApi.update(user._id, { name: form.name, phone: form.phone, designation: form.designation, branch: form.branch })
+        toast.success('Employee updated')
+      }
       onDone()
     } catch (err) { toast.error(err.response?.data?.message || 'Failed') }
     finally { setBusy(false) }

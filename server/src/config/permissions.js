@@ -48,6 +48,7 @@ export const ROLE_PERMISSIONS = {
     [MODULES.POSSESSION]: ['view', 'create', 'edit', 'delete', 'export'], // Possession tracking
     [MODULES.ROLE]: ['view', 'create', 'edit', 'delete'], // Custom-role engine (Admin)
     [MODULES.TASK]: ['view', 'create', 'edit', 'delete', 'assign'], // Task Management: assign & track executive tasks
+    [MODULES.SETTINGS]: ['view', 'edit', 'test', 'send_test', 'update_email'], // Company Settings & SMTP Configuration
   },
 
   [SUB_ADMIN]: {

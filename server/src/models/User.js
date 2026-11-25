@@ -96,6 +96,13 @@ const userSchema = new Schema(
     },
     isActive: { type: Boolean, default: true },
 
+    // Employee Invitation & Account Status (Pending until invitation accepted & password created)
+    status: { type: String, enum: ['pending', 'active', 'inactive', 'disabled'], default: 'active' },
+    invitationTokenHash: { type: String, select: false },
+    invitationTokenExpires: { type: Date, select: false },
+    invitationSentAt: { type: Date },
+    invitationAcceptedAt: { type: Date },
+
     // Password reset (OTP/email) — Section 2 "Forgot Password" flow.
     resetOtpHash: { type: String, select: false },
     resetOtpExpires: { type: Date, select: false },
@@ -134,6 +141,8 @@ userSchema.set('toJSON', {
     delete ret.refreshTokens
     delete ret.resetOtpHash
     delete ret.resetOtpExpires
+    delete ret.invitationTokenHash
+    delete ret.invitationTokenExpires
     return ret
   },
 })
