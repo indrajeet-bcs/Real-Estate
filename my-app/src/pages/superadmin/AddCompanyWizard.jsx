@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { firmsApi } from '../../api/resources.js'
+import { firmsApi, usersApi } from '../../api/resources.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { Button, Input, Select, Modal } from '../../components/ui.jsx'
+import { validateEmailClient } from '../../lib/emailValidation.js'
 
 const PLANS = [
   { id: 'standard', name: 'Standard', monthly: 0, yearly: 0, users: 5, storage: 2, features: ['Basic CRM', 'Email Support'] },
@@ -17,6 +18,7 @@ export default function AddCompanyWizard({ onClose, onDone }) {
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
   const [createdFirm, setCreatedFirm] = useState(null)
+  const [adminEmailCheck, setAdminEmailCheck] = useState({ checking: false, valid: null, reason: '' })
 
   const [form, setForm] = useState({
     // Step 1: Company Info
@@ -48,7 +50,33 @@ export default function AddCompanyWizard({ onClose, onDone }) {
     forcePasswordChange: true,
   })
 
-  const setF = (k) => (e) => setForm(prev => ({ ...prev, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
+  const setF = (k) => (e) => {
+    const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+    setForm(prev => ({ ...prev, [k]: val }))
+    if (k === 'adminEmail') setAdminEmailCheck({ checking: false, valid: null, reason: '' })
+  }
+
+  const verifyAdminEmail = async (val) => {
+    const clean = String(val || '').trim().toLowerCase()
+    if (!clean) return
+    const client = validateEmailClient(clean, 'Admin Email')
+    if (!client.valid) {
+      setAdminEmailCheck({ checking: false, valid: false, reason: client.reason })
+      return
+    }
+    setAdminEmailCheck({ checking: true, valid: null, reason: '' })
+    try {
+      const res = await usersApi.validateEmail(clean)
+      const data = res.data?.data || {}
+      setAdminEmailCheck({
+        checking: false,
+        valid: Boolean(data.valid && !data.alreadyRegistered),
+        reason: data.alreadyRegistered ? 'An account with this admin email already exists' : (data.reason || ''),
+      })
+    } catch {
+      setAdminEmailCheck({ checking: false, valid: null, reason: '' })
+    }
+  }
 
   const handleNext = () => setStep(s => Math.min(4, s + 1))
   const handlePrev = () => setStep(s => Math.max(1, s - 1))
@@ -97,9 +125,19 @@ export default function AddCompanyWizard({ onClose, onDone }) {
   }
 
   // Validations
-  const isStep1Valid = form.name.trim() && form.contactEmail.trim() && form.contactPhone.trim()
+  const contactEmailCheck = validateEmailClient(form.contactEmail, 'Company Email')
+  const officialEmailCheck = form.officialEmail.trim() ? validateEmailClient(form.officialEmail, 'Official Email') : { valid: true }
+  const adminEmailClient = validateEmailClient(form.adminEmail, 'Admin Email')
+
+  const isStep1Valid = form.name.trim() && contactEmailCheck.valid && officialEmailCheck.valid && form.contactPhone.trim()
   const isStep2Valid = form.plan !== '' && (!form.enableTrial || form.trialDays > 0)
-  const isStep3Valid = form.adminName.trim() && form.adminEmail.trim() && form.adminPassword.length >= 8 && form.adminPassword === form.confirmPassword
+  const isStep3Valid =
+    form.adminName.trim() &&
+    adminEmailClient.valid &&
+    adminEmailCheck.valid !== false &&
+    !adminEmailCheck.checking &&
+    form.adminPassword.length >= 8 &&
+    form.adminPassword === form.confirmPassword
 
   const renderStepper = () => (
     <div className="flex items-center justify-between mb-8 relative">
@@ -128,8 +166,18 @@ export default function AddCompanyWizard({ onClose, onDone }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input label="Company Name *" value={form.name} onChange={setF('name')} placeholder="e.g. Acme Corp" />
         <Input label="Company Logo (URL)" value={form.logo} onChange={setF('logo')} placeholder="https://..." />
-        <Input label="Company Email *" type="email" value={form.contactEmail} onChange={setF('contactEmail')} />
-        <Input label="Company Official Email (Default Sender)" type="email" value={form.officialEmail} onChange={setF('officialEmail')} placeholder="e.g. notifications@acmecorp.com" />
+        <div>
+          <Input label="Company Email *" type="email" value={form.contactEmail} onChange={setF('contactEmail')} />
+          {form.contactEmail && !contactEmailCheck.valid && (
+            <p className="mt-1 text-[11px] text-rose-600">{contactEmailCheck.reason}</p>
+          )}
+        </div>
+        <div>
+          <Input label="Company Official Email (Default Sender)" type="email" value={form.officialEmail} onChange={setF('officialEmail')} placeholder="e.g. notifications@company.com" />
+          {form.officialEmail && !officialEmailCheck.valid && (
+            <p className="mt-1 text-[11px] text-rose-600">{officialEmailCheck.reason}</p>
+          )}
+        </div>
         <Input label="Mobile Number *" value={form.contactPhone} onChange={setF('contactPhone')} />
         <Input label="Website" value={form.website} onChange={setF('website')} />
         <Input label="GST Number" value={form.gstNumber} onChange={setF('gstNumber')} />
@@ -213,7 +261,27 @@ export default function AddCompanyWizard({ onClose, onDone }) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input label="Full Name *" value={form.adminName} onChange={setF('adminName')} />
-        <Input label="Admin Email *" type="email" value={form.adminEmail} onChange={setF('adminEmail')} />
+        <div>
+          <Input
+            label="Admin Email *"
+            type="email"
+            value={form.adminEmail}
+            onChange={setF('adminEmail')}
+            onBlur={() => verifyAdminEmail(form.adminEmail)}
+          />
+          {form.adminEmail && !adminEmailClient.valid && (
+            <p className="mt-1 text-[11px] text-rose-600">{adminEmailClient.reason}</p>
+          )}
+          {adminEmailClient.valid && adminEmailCheck.checking && (
+            <p className="mt-1 text-[11px] text-slate-500">Verifying email domain MX records…</p>
+          )}
+          {adminEmailClient.valid && !adminEmailCheck.checking && adminEmailCheck.valid === true && (
+            <p className="mt-1 text-[11px] text-emerald-600 font-medium">✓ Deliverable email domain verified</p>
+          )}
+          {adminEmailClient.valid && !adminEmailCheck.checking && adminEmailCheck.valid === false && (
+            <p className="mt-1 text-[11px] text-rose-600">{adminEmailCheck.reason}</p>
+          )}
+        </div>
         <Input label="Mobile Number" value={form.adminPhone} onChange={setF('adminPhone')} />
         <div className="hidden md:block"></div>
         <Input label="Temporary Password *" type="password" value={form.adminPassword} onChange={setF('adminPassword')} />

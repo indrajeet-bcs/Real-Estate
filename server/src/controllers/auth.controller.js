@@ -1,4 +1,5 @@
 import User from '../models/User.js'
+import Firm from '../models/Firm.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ok } from '../utils/apiResponse.js'
@@ -233,8 +234,8 @@ export const logoutAllDevices = asyncHandler(async (req, res) => {
 
 // POST /api/auth/forgot-password — generates an OTP and emails it to the user.
 export const forgotPassword = asyncHandler(async (req, res) => {
-  const { email } = req.body
-  const user = await User.findOne({ email }).select('+resetOtpHash +resetOtpExpires')
+  const cleanEmail = String(req.body.email || '').trim().toLowerCase()
+  const user = await User.findOne({ email: cleanEmail }).select('+resetOtpHash +resetOtpExpires')
   // Always respond success to avoid account enumeration.
   if (!user || !user.isActive) {
     return ok(res, null, 'If the account exists, an OTP has been sent')
@@ -245,10 +246,19 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 min
   await user.save()
 
-  // Send real OTP email to the registered address.
-  // With direct SSL on port 465, this takes ~2 seconds and ensures the container
-  // finishes delivering the SMTP packet before closing the request.
+  // Use the user's company SMTP if configured; otherwise fall back to platform SMTP
+  let targetFirmId = null
+  if (user.firm) {
+    const firmDoc = await Firm.findById(user.firm)
+      .select('smtpConfig.isConfigured smtpConfig.host smtpConfig.username')
+      .lean()
+    if (firmDoc?.smtpConfig?.isConfigured && firmDoc?.smtpConfig?.host && firmDoc?.smtpConfig?.username) {
+      targetFirmId = user.firm
+    }
+  }
+
   const emailResult = await sendOtpEmail({
+    firmId: targetFirmId,
     to: user.email,
     name: user.name,
     otp,
@@ -261,19 +271,26 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
 // POST /api/auth/reset-password
 export const resetPassword = asyncHandler(async (req, res) => {
-  const { email, otp, newPassword } = req.body
-  const user = await User.findOne({ email }).select('+resetOtpHash +resetOtpExpires +refreshTokens')
+  const cleanEmail = String(req.body.email || '').trim().toLowerCase()
+  const cleanOtp = String(req.body.otp || '').trim()
+  const { newPassword } = req.body
+  const user = await User.findOne({ email: cleanEmail })
+    .select('+resetOtpHash +resetOtpExpires +invitationTokenHash +invitationTokenExpires +refreshTokens')
   if (!user || !user.resetOtpHash || !user.resetOtpExpires) {
     throw ApiError.badRequest('Invalid or expired OTP')
   }
-  if (user.resetOtpExpires.getTime() < Date.now() || user.resetOtpHash !== hashToken(otp)) {
+  if (user.resetOtpExpires.getTime() < Date.now() || user.resetOtpHash !== hashToken(cleanOtp)) {
     throw ApiError.badRequest('Invalid or expired OTP')
   }
 
   user.password = newPassword
+  user.status = 'active'
   user.resetOtpHash = undefined
   user.resetOtpExpires = undefined
+  user.invitationTokenHash = undefined
+  user.invitationTokenExpires = undefined
   user.mustSetPassword = false
+  user.passwordChangedAt = new Date()
   user.refreshTokens = [] // force re-login everywhere
   await user.save()
 

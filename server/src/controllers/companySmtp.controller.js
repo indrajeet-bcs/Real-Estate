@@ -11,6 +11,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { ok } from '../utils/apiResponse.js'
 import { writeAudit } from '../middleware/audit.js'
 import { AUDIT_ACTIONS, MODULES, ROLES } from '../config/constants.js'
+import { assertRealEmail } from '../utils/emailValidator.js'
 
 /**
  * Determines the target firmId based on the authenticated user's role.
@@ -108,7 +109,10 @@ export const updateSmtpConfig = asyncHandler(async (req, res) => {
   }
 
   if (officialEmailInput !== undefined) {
-    firm.officialEmail = officialEmailInput.trim().toLowerCase()
+    const trimmedOfficial = officialEmailInput.trim()
+    firm.officialEmail = trimmedOfficial
+      ? await assertRealEmail(trimmedOfficial, { label: 'Company official email' })
+      : ''
   }
 
   if (!firm.smtpConfig) {

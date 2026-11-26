@@ -7,6 +7,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { ok, created } from '../utils/apiResponse.js'
 import { writeAudit } from '../middleware/audit.js'
 import { AUDIT_ACTIONS, MODULES, ROLES } from '../config/constants.js'
+import { assertRealEmail } from '../utils/emailValidator.js'
 
 // Every collection that stores firm-scoped data. A permanent firm delete cascades
 // a deleteMany({ firm }) across each of these before removing the firm itself.
@@ -23,12 +24,20 @@ const FIRM_SCOPED_MODELS = [
 export const createFirm = asyncHandler(async (req, res) => {
   const { admin, ...firmData } = req.body
 
-  const emailTaken = await User.findOne({ email: admin.email })
+  const cleanAdminEmail = await assertRealEmail(admin.email, { label: 'Admin email' })
+  if (firmData.officialEmail?.trim()) {
+    firmData.officialEmail = await assertRealEmail(firmData.officialEmail, { label: 'Company official email' })
+  }
+  if (firmData.contactEmail?.trim()) {
+    firmData.contactEmail = await assertRealEmail(firmData.contactEmail, { label: 'Company email' })
+  }
+
+  const emailTaken = await User.findOne({ email: cleanAdminEmail })
   if (emailTaken) throw ApiError.conflict('An account with that admin email already exists')
 
   const officialEmail = firmData.officialEmail
     ? firmData.officialEmail.trim().toLowerCase()
-    : (firmData.contactEmail ? firmData.contactEmail.trim().toLowerCase() : admin.email.trim().toLowerCase())
+    : (firmData.contactEmail ? firmData.contactEmail.trim().toLowerCase() : cleanAdminEmail)
 
   const firm = await Firm.create({
     ...firmData,
@@ -39,7 +48,7 @@ export const createFirm = asyncHandler(async (req, res) => {
   try {
     adminUser = await User.create({
       name: admin.name,
-      email: admin.email,
+      email: cleanAdminEmail,
       password: admin.password,
       phone: admin.phone,
       role: ROLES.ADMIN,
@@ -175,7 +184,18 @@ export const getFirm = asyncHandler(async (req, res) => {
 
 // PATCH /api/firms/:id  (Super Admin)
 export const updateFirm = asyncHandler(async (req, res) => {
-  const firm = await Firm.findByIdAndUpdate(req.params.id, req.body, {
+  const existing = await Firm.findById(req.params.id)
+  if (!existing) throw ApiError.notFound('Firm not found')
+
+  const updates = { ...req.body }
+  if (updates.officialEmail !== undefined && updates.officialEmail.trim() && updates.officialEmail.trim().toLowerCase() !== existing.officialEmail) {
+    updates.officialEmail = await assertRealEmail(updates.officialEmail, { label: 'Company official email' })
+  }
+  if (updates.contactEmail !== undefined && updates.contactEmail.trim() && updates.contactEmail.trim().toLowerCase() !== existing.contactEmail) {
+    updates.contactEmail = await assertRealEmail(updates.contactEmail, { label: 'Company email' })
+  }
+
+  const firm = await Firm.findByIdAndUpdate(req.params.id, updates, {
     new: true,
     runValidators: true,
   })

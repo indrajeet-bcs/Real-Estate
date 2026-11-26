@@ -33,6 +33,7 @@ export const usersApi = {
   activate: (id) => api.patch(`/users/${id}/activate`),
   transfer: (id, body) => api.patch(`/users/${id}/transfer`, body),
   resendInvitation: (id) => api.post(`/users/${id}/resend-invitation`),
+  validateEmail: (email) => api.post('/users/validate-email', { email }),
 }
 
 export const companySmtpApi = {

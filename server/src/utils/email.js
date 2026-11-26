@@ -497,15 +497,23 @@ export async function sendEmail({ to, subject, html, text }) {
  * Send a 6-digit Password Reset OTP email.
  */
 export async function sendOtpEmail({ firmId, to, name, otp }) {
+  let brandTitle = 'Real Estate CRM'
+  if (firmId) {
+    try {
+      const firm = await Firm.findById(firmId).select('name').lean()
+      if (firm?.name) brandTitle = firm.name
+    } catch {}
+  }
+
   const displayName = name || 'there'
-  const subject = `Your Password Reset OTP: ${otp}`
+  const subject = `${brandTitle} - Your Password Reset OTP: ${otp}`
 
   const text = `Hello ${displayName},\n\n` +
-    `You requested to reset your password for your Real Estate CRM account.\n\n` +
+    `You requested to reset your password for your ${brandTitle} account.\n\n` +
     `Your OTP verification code is: ${otp}\n\n` +
     `This code is valid for 10 minutes. Please do not share this code with anyone.\n\n` +
     `If you did not request this, please ignore this email.\n\n` +
-    `Regards,\nReal Estate CRM Team`
+    `Regards,\n${brandTitle} Team`
 
   const html = `
     <!DOCTYPE html>
@@ -529,7 +537,7 @@ export async function sendOtpEmail({ firmId, to, name, otp }) {
       <body>
         <div class="container">
           <div class="header">
-            <h1>Real Estate CRM</h1>
+            <h1>${brandTitle}</h1>
           </div>
           <div class="content">
             <div class="greeting">Hello ${displayName},</div>
@@ -547,7 +555,7 @@ export async function sendOtpEmail({ firmId, to, name, otp }) {
             </div>
           </div>
           <div class="footer">
-            &copy; ${new Date().getFullYear()} Real Estate CRM. All rights reserved.
+            &copy; ${new Date().getFullYear()} ${brandTitle}. All rights reserved.
           </div>
         </div>
       </body>
@@ -555,7 +563,10 @@ export async function sendOtpEmail({ firmId, to, name, otp }) {
   `
 
   if (firmId) {
-    return sendCompanyEmail({ firmId, to, subject, html, text })
+    const companyRes = await sendCompanyEmail({ firmId, to, subject, html, text })
+    if (companyRes.sent || !companyRes.notConfigured) {
+      return companyRes
+    }
   }
   return sendEmail({ to, subject, html, text })
 }

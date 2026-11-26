@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Modal, Button, Input, Select } from '../ui.jsx'
 import { usersApi, branchesApi } from '../../api/resources.js'
 import { useToast } from '../../context/ToastContext.jsx'
+import { validateEmailClient } from '../../lib/emailValidation.js'
 
 const ROLE_OPTIONS = [
   { value: 'sales_executive', label: 'Sales Executive', desc: 'Can manage own leads, follow-ups, visits, and bookings' },
@@ -63,6 +64,14 @@ export default function UserRegistrationModal({
   const [activeTab, setActiveTab] = useState('credentials')
   const [busy, setBusy] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [emailVerification, setEmailVerification] = useState({
+    checking: false,
+    email: '',
+    valid: null,
+    reason: '',
+    suggestion: '',
+    alreadyRegistered: false,
+  })
 
   const prevOpenRef = useRef(false)
   const prevUserIdRef = useRef(null)
@@ -133,6 +142,7 @@ export default function UserRegistrationModal({
         })
       }
       setErrorMsg('')
+      setEmailVerification({ checking: false, email: '', valid: null, reason: '', suggestion: '', alreadyRegistered: false })
       setActiveTab('credentials')
     }
 
@@ -149,7 +159,47 @@ export default function UserRegistrationModal({
 
   const setField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }))
+    if (field === 'email') {
+      setEmailVerification({ checking: false, email: '', valid: null, reason: '', suggestion: '', alreadyRegistered: false })
+    }
     if (errorMsg) setErrorMsg('')
+  }
+
+  const canEditEmail = isNew || user?.status === 'pending'
+
+  const verifyEmailDomain = async (emailVal) => {
+    const clean = String(emailVal || '').trim().toLowerCase()
+    if (!clean || !canEditEmail) return
+    if (!isNew && clean === user?.email?.toLowerCase()) return
+
+    const clientCheck = validateEmailClient(clean, 'Email')
+    if (!clientCheck.valid) {
+      setEmailVerification({
+        checking: false,
+        email: clean,
+        valid: false,
+        reason: clientCheck.reason,
+        suggestion: clientCheck.suggestion || '',
+        alreadyRegistered: false,
+      })
+      return
+    }
+
+    setEmailVerification({ checking: true, email: clean, valid: null, reason: '', suggestion: '', alreadyRegistered: false })
+    try {
+      const res = await usersApi.validateEmail(clean)
+      const data = res.data?.data || {}
+      setEmailVerification({
+        checking: false,
+        email: clean,
+        valid: Boolean(data.valid && !data.alreadyRegistered),
+        reason: data.alreadyRegistered ? 'An account with this email already exists' : (data.reason || ''),
+        suggestion: data.suggestion || '',
+        alreadyRegistered: Boolean(data.alreadyRegistered),
+      })
+    } catch {
+      setEmailVerification({ checking: false, email: '', valid: null, reason: '', suggestion: '', alreadyRegistered: false })
+    }
   }
 
   // Filter roles if restricted
@@ -158,13 +208,11 @@ export default function UserRegistrationModal({
     : ROLE_OPTIONS
 
   // Validation rules
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  const isEmailValid = isNew ? emailRegex.test(form.email.trim()) : true
+  const emailClientResult = canEditEmail ? validateEmailClient(form.email, 'Email') : { valid: true }
+  const isEmailValid = canEditEmail ? emailClientResult.valid : true
   const isNameValid = form.name.trim().length >= 2
   const isPasswordValid = form.password ? form.password.length >= 8 : true
   const isPhoneValid = !form.phone || /^[0-9+ -]{7,15}$/.test(form.phone.trim())
-
-  const canSubmit = isNameValid && isEmailValid && isPasswordValid && isPhoneValid && !busy
 
   const handleSave = async (e) => {
     if (e) e.preventDefault()
@@ -173,10 +221,18 @@ export default function UserRegistrationModal({
       setActiveTab('credentials')
       return
     }
-    if (isNew && (!form.email.trim() || !emailRegex.test(form.email.trim()))) {
-      setErrorMsg('Please enter a valid email address')
-      setActiveTab('credentials')
-      return
+    if (canEditEmail) {
+      const clientCheck = validateEmailClient(form.email, 'Email')
+      if (!clientCheck.valid) {
+        setErrorMsg(clientCheck.reason)
+        setActiveTab('credentials')
+        return
+      }
+      if (emailVerification.email === clientCheck.email && emailVerification.valid === false) {
+        setErrorMsg(emailVerification.reason || 'Please enter a valid deliverable email address')
+        setActiveTab('credentials')
+        return
+      }
     }
     if (form.password && form.password.length < 8) {
       setErrorMsg('Password must be at least 8 characters if provided')
@@ -230,6 +286,7 @@ export default function UserRegistrationModal({
       } else {
         const payload = {
           name: form.name.trim(),
+          ...(canEditEmail && form.email?.trim() ? { email: form.email.trim().toLowerCase() } : {}),
           phone: form.phone.trim() || undefined,
           branch: form.branch || undefined,
           department: form.department || undefined,
@@ -409,21 +466,45 @@ export default function UserRegistrationModal({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <div className="mb-1 block text-xs font-semibold text-slate-700">
-                Email Address {isNew && <span className="text-rose-500">*</span>}
+                Email Address {canEditEmail && <span className="text-rose-500">*</span>}
               </div>
               <Input
                 type="email"
-                placeholder="e.g. rahul@company.com"
+                placeholder="e.g. rahul@gmail.com"
                 value={form.email}
-                disabled={!isNew}
+                disabled={!canEditEmail}
                 onChange={(e) => setField('email', e.target.value)}
+                onBlur={() => verifyEmailDomain(form.email)}
                 autoComplete="off"
               />
-              {isNew && !isEmailValid && form.email && (
-                <p className="mt-1 text-[11px] text-rose-500">Enter a valid email address</p>
+              {canEditEmail && form.email && !isEmailValid && (
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-rose-600">
+                  <span>{emailClientResult.reason}</span>
+                  {emailClientResult.suggestion && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setField('email', emailClientResult.suggestion)
+                        verifyEmailDomain(emailClientResult.suggestion)
+                      }}
+                      className="font-semibold text-blue-600 underline hover:text-blue-700"
+                    >
+                      Use {emailClientResult.suggestion}
+                    </button>
+                  )}
+                </div>
               )}
-              {!isNew && (
-                <p className="mt-1 text-[11px] text-slate-400">Email cannot be changed after registration</p>
+              {canEditEmail && isEmailValid && emailVerification.checking && (
+                <p className="mt-1 text-[11px] text-slate-500">Checking email domain MX records…</p>
+              )}
+              {canEditEmail && isEmailValid && !emailVerification.checking && emailVerification.valid === true && (
+                <p className="mt-1 text-[11px] text-emerald-600 font-medium">✓ Valid deliverable email domain verified</p>
+              )}
+              {canEditEmail && isEmailValid && !emailVerification.checking && emailVerification.valid === false && (
+                <p className="mt-1 text-[11px] text-rose-600">{emailVerification.reason}</p>
+              )}
+              {!canEditEmail && (
+                <p className="mt-1 text-[11px] text-slate-400">Active user email cannot be changed here</p>
               )}
             </div>
 

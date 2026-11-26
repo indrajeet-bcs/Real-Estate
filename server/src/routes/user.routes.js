@@ -21,6 +21,7 @@ router.use(authenticate, requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SUB_A
 router.get('/', validate(listUsersSchema, 'query'), requirePermission(MODULES.USER, 'view'), userCtrl.listUsers)
 // Static route must precede the parameterised `/:id`.
 router.get('/stats', requirePermission(MODULES.USER, 'view'), userCtrl.employeeStats)
+router.post('/validate-email', userCtrl.validateEmail)
 router.get('/:id', requirePermission(MODULES.USER, 'view'), userCtrl.getUser)
 router.post('/', validate(createUserSchema), requirePermission(MODULES.USER, 'create'), userCtrl.createUser)
 router.patch('/:id', validate(updateUserSchema), requirePermission(MODULES.USER, 'edit'), userCtrl.updateUser)

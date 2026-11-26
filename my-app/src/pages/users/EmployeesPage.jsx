@@ -3,6 +3,7 @@ import { usersApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate, titleCase } from '../../lib/format.js'
+import { validateEmailClient } from '../../lib/emailValidation.js'
 import {
   PageHeader, Button, Input, Select, Table, Pagination, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
@@ -85,6 +86,11 @@ function CreateModal({ role, onClose, onDone }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   async function save() {
+    const emailCheck = validateEmailClient(form.email, 'Email')
+    if (!emailCheck.valid) {
+      toast.error(emailCheck.reason)
+      return
+    }
     if (form.password && form.password.length < 8) {
       toast.error('Password must be at least 8 characters if provided')
       return

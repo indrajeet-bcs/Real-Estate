@@ -10,6 +10,7 @@ import AuditLog from '../models/AuditLog.js'
 import crypto from 'crypto'
 import { generateOtp, hashToken } from '../utils/token.js'
 import { sendNewUserInviteEmail, sendCompanyInvitationEmail } from '../utils/email.js'
+import { assertRealEmail, verifyRealEmail } from '../utils/emailValidator.js'
 import { env, isProd } from '../config/env.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
@@ -230,6 +231,18 @@ export const getUser = asyncHandler(async (req, res) => {
   }, 'Employee details')
 })
 
+// POST /api/users/validate-email — live real-email validation (syntax, domain hygiene, MX record check)
+export const validateEmail = asyncHandler(async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase()
+  if (!email) throw ApiError.badRequest('Email is required')
+  const result = await verifyRealEmail(email, { label: 'Email' })
+  const alreadyRegistered = result.valid ? Boolean(await User.exists({ email: result.email })) : false
+  return ok(res, {
+    ...result,
+    alreadyRegistered,
+  }, result.valid ? (alreadyRegistered ? 'Email already exists in system' : 'Valid deliverable email domain') : result.reason)
+})
+
 // POST /api/users — create a sub-admin (by admin) or executive (by admin/sub-admin).
 export const createUser = asyncHandler(async (req, res) => {
   const { role } = req.body
@@ -237,7 +250,7 @@ export const createUser = asyncHandler(async (req, res) => {
     throw ApiError.forbidden(`You cannot create a ${role}`)
   }
 
-  const cleanEmail = (req.body.email || '').trim().toLowerCase()
+  const cleanEmail = await assertRealEmail(req.body.email, { label: 'Employee email' })
   const exists = await User.findOne({ email: cleanEmail })
   if (exists) throw ApiError.conflict('An account with that email already exists')
 
@@ -345,13 +358,14 @@ export const updateUser = asyncHandler(async (req, res) => {
     throw ApiError.forbidden('Cannot assign a role at or above your own')
   }
 
-  if (req.body.email && req.body.email.toLowerCase() !== target.email) {
-    const exists = await User.findOne({ email: req.body.email.toLowerCase(), _id: { $ne: target._id } })
+  if (req.body.email && req.body.email.trim().toLowerCase() !== target.email) {
+    const cleanNewEmail = await assertRealEmail(req.body.email, { label: 'Employee email' })
+    const exists = await User.findOne({ email: cleanNewEmail, _id: { $ne: target._id } })
     if (exists) throw ApiError.conflict('An account with that email already exists')
-    target.email = req.body.email.toLowerCase()
+    target.email = cleanNewEmail
   }
 
-  const { permissions, manager, password, ...rest } = req.body
+  const { permissions, manager, password, email: _ignoredEmail, ...rest } = req.body
   Object.assign(target, rest)
   if (manager !== undefined) {
     target.manager = manager || null
