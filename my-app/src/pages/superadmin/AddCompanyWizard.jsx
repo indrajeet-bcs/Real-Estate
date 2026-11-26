@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { firmsApi, usersApi } from '../../api/resources.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { Button, Input, Select, Modal } from '../../components/ui.jsx'
+import { Button, Input, MobileInput, Select, Modal } from '../../components/ui.jsx'
 import { validateEmailClient } from '../../lib/emailValidation.js'
 
 const PLANS = [
@@ -178,7 +178,7 @@ export default function AddCompanyWizard({ onClose, onDone }) {
             <p className="mt-1 text-[11px] text-rose-600">{officialEmailCheck.reason}</p>
           )}
         </div>
-        <Input label="Mobile Number *" value={form.contactPhone} onChange={setF('contactPhone')} />
+        <MobileInput label="Mobile Number *" value={form.contactPhone} onChange={setF('contactPhone')} />
         <Input label="Website" value={form.website} onChange={setF('website')} />
         <Input label="GST Number" value={form.gstNumber} onChange={setF('gstNumber')} />
       </div>
@@ -282,7 +282,7 @@ export default function AddCompanyWizard({ onClose, onDone }) {
             <p className="mt-1 text-[11px] text-rose-600">{adminEmailCheck.reason}</p>
           )}
         </div>
-        <Input label="Mobile Number" value={form.adminPhone} onChange={setF('adminPhone')} />
+        <MobileInput label="Mobile Number" value={form.adminPhone} onChange={setF('adminPhone')} />
         <div className="hidden md:block"></div>
         <Input label="Temporary Password *" type="password" value={form.adminPassword} onChange={setF('adminPassword')} />
         <Input label="Confirm Password *" type="password" value={form.confirmPassword} onChange={setF('confirmPassword')} />

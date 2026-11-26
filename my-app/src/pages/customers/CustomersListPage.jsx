@@ -8,7 +8,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { ROLES, CUSTOMER_STATUS } from '../../lib/constants.js'
 import { formatDate, titleCase } from '../../lib/format.js'
 import {
-  PageHeader, Button, Input, Select, Table, Pagination, StatusBadge,
+  PageHeader, Button, Input, MobileInput, Select, Table, Pagination, StatusBadge,
   Loader, ErrorState, Modal,
 } from '../../components/ui.jsx'
 
@@ -190,12 +190,9 @@ function CreateLeadModal({ onClose, onCreated }) {
     >
       <form onSubmit={submit} className="space-y-4">
         <Input label="Full name" required value={form.name} onChange={set('name')} />
-        <Input
+        <MobileInput
           label="Mobile"
           required
-          type="tel"
-          placeholder="10-digit mobile number"
-          maxLength={10}
           value={form.mobile}
           onChange={handleMobileChange}
           onBlur={() => setTouched((t) => ({ ...t, mobile: true }))}

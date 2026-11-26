@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { optionalIndianMobileSchema } from '../utils/phoneValidation.js'
 
 export const createFirmSchema = z.object({
   name: z.string().min(2, 'Firm name is required'),
@@ -7,14 +8,14 @@ export const createFirmSchema = z.object({
   region: z.string().optional(),
   branches: z.array(z.string()).optional(),
   contactEmail: z.string().email().optional().or(z.literal('')),
-  contactPhone: z.string().optional(),
+  contactPhone: optionalIndianMobileSchema,
   officialEmail: z.string().email('Please enter a valid official email address').optional().or(z.literal('')),
   // Admin account created alongside the firm (the firm owner).
   admin: z.object({
     name: z.string().min(2, 'Admin name is required'),
     email: z.string().email(),
     password: z.string().min(8, 'Password must be at least 8 characters'),
-    phone: z.string().optional(),
+    phone: optionalIndianMobileSchema,
   }),
 })
 
@@ -24,7 +25,7 @@ export const updateFirmSchema = z.object({
   region: z.string().optional(),
   branches: z.array(z.string()).optional(),
   contactEmail: z.string().email().optional().or(z.literal('')),
-  contactPhone: z.string().optional(),
+  contactPhone: optionalIndianMobileSchema,
   officialEmail: z.string().email('Please enter a valid official email address').optional().or(z.literal('')),
 })
 

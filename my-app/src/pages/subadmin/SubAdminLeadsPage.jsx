@@ -4,7 +4,7 @@ import { customersApi, usersApi, reportsApi, leadTransfersApi } from '../../api/
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { titleCase, exportRowsToCsv } from '../../lib/format.js'
-import { PageHeader, Card, StatCard, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState } from '../../components/ui.jsx'
+import { PageHeader, Card, StatCard, Button, Input, MobileInput, Select, Table, StatusBadge, Modal, Loader, ErrorState } from '../../components/ui.jsx'
 import { TransferOwnershipModal } from '../admin/LeadsPage.jsx'
 import ImportLeadsModal from '../../components/ImportLeadsModal.jsx'
 
@@ -278,11 +278,9 @@ function AddLeadModal({ execs, onClose, onDone }) {
     }>
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Customer Name" value={form.name} onChange={set('name')} />
-        <Input
+        <MobileInput
           label="Mobile Number"
-          type="tel"
-          placeholder="10-digit mobile number"
-          maxLength={10}
+          required
           value={form.mobile}
           onChange={handleMobileChange}
           onBlur={() => setTouched((t) => ({ ...t, mobile: true }))}

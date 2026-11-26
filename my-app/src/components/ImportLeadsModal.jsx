@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { customersApi } from '../api/resources.js'
 import { useToast } from '../context/ToastContext.jsx'
+import { parseExcelIndianMobile } from '../lib/phoneValidation.js'
 import { Modal, Button, Select } from './ui.jsx'
 
 // Standard headers for sample template and mapping
@@ -243,9 +244,10 @@ export default function ImportLeadsModal({ execs = [], onClose, onDone }) {
     return parsedRows.map((r) => {
       const name = (r.name || '').trim()
       const rawMobile = r.mobile || ''
-      const mobile = cleanMobile(rawMobile)
-      const altMobile = cleanMobile(r.altMobile || '')
+      const mobileCheck = parseExcelIndianMobile(rawMobile)
+      const mobile = mobileCheck.valid ? mobileCheck.mobile : ''
 
+      let altMobile = ''
       const errors = []
 
       // Name validation
@@ -256,14 +258,19 @@ export default function ImportLeadsModal({ execs = [], onClose, onDone }) {
       }
 
       // Mobile validation
-      if (!mobile) {
-        errors.push('Mobile number is required')
-      } else if (mobile.length !== 10) {
-        errors.push(`Mobile must be 10 digits (${mobile.length}/10)`)
-      } else if (!/^[6-9]/.test(mobile)) {
-        errors.push('Mobile must start with 6, 7, 8, or 9')
+      if (!mobileCheck.valid) {
+        errors.push(mobileCheck.error)
       } else if (seenMobiles.has(mobile)) {
         errors.push(`Duplicate mobile ${mobile} in file`)
+      }
+
+      if (r.altMobile) {
+        const altCheck = parseExcelIndianMobile(r.altMobile)
+        if (!altCheck.valid) {
+          errors.push(`Alt Mobile: ${altCheck.error}`)
+        } else {
+          altMobile = altCheck.mobile
+        }
       }
 
       if (mobile) {

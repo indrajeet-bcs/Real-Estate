@@ -6,7 +6,7 @@ import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate, titleCase } from '../../lib/format.js'
 import { validateEmailClient } from '../../lib/emailValidation.js'
-import { PageHeader, Card, Button, Input, Modal, Table, StatCard, StatusBadge, Loader, ErrorState } from '../../components/ui.jsx'
+import { PageHeader, Card, Button, Input, MobileInput, Modal, Table, StatCard, StatusBadge, Loader, ErrorState } from '../../components/ui.jsx'
 
 const inr = (n) => {
   const v = Number(n) || 0
@@ -380,7 +380,7 @@ function EmployeeModal({ user, onClose, onDone }) {
         <Input label="Full name" value={form.name} onChange={set('name')} />
         {isNew && <Input label="Email" type="email" value={form.email} onChange={set('email')} />}
         {isNew && <Input label="Password (optional)" type="password" placeholder="Leave blank to send OTP email" value={form.password} onChange={set('password')} />}
-        <Input label="Phone" value={form.phone} onChange={set('phone')} />
+        <MobileInput label="Phone" value={form.phone} onChange={set('phone')} />
         <Input label="Designation" value={form.designation} onChange={set('designation')} />
         <Input label="Branch" value={form.branch} onChange={set('branch')} />
       </div>

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { supportMembersApi } from '../../../api/resources.js'
 import { useFetch } from '../../../hooks/useFetch.js'
 import { useToast } from '../../../context/ToastContext.jsx'
-import { PageHeader, Button, Input, Loader, ErrorState, Modal, Table } from '../../../components/ui.jsx'
+import { PageHeader, Button, Input, MobileInput, Loader, ErrorState, Modal, Table } from '../../../components/ui.jsx'
 
 export default function SupportMembersPage() {
   const toast = useToast()
@@ -117,7 +117,7 @@ export default function SupportMembersPage() {
             <Input label="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <Input label="Role" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} />
             <Input label="Email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-            <Input label="Mobile Number" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} />
+            <MobileInput label="Mobile Number" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} />
           </div>
         </Modal>
       )}

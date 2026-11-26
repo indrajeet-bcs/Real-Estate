@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { formatMoney, formatDate, titleCase } from '../../lib/format.js'
 import {
-  PageHeader, Card, StatCard, Button, Input, Select, Textarea, Table, StatusBadge, Modal, Loader, ErrorState,
+  PageHeader, Card, StatCard, Button, Input, MobileInput, Select, Textarea, Table, StatusBadge, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
 
 // Compact icon action buttons (match the branches/employees row-action style).
@@ -659,7 +659,7 @@ function BuilderModal({ builder, onClose, onDone }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Legal builder name" required value={form.name} onChange={set('name')} />
         <Input label="Contact person" required value={form.contactPerson} onChange={set('contactPerson')} />
-        <Input label="Mobile" required value={form.phone} onChange={set('phone')} />
+        <MobileInput label="Mobile" required value={form.phone} onChange={set('phone')} />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} />
         <Input label="City" required value={form.city} onChange={set('city')} />
         <Input label="GST number" value={form.gstNumber} onChange={set('gstNumber')} />

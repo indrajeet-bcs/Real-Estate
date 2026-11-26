@@ -8,7 +8,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { formatDate, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import {
-  PageHeader, Card, StatCard, Button, Input, Select, Textarea, Table, StatusBadge, Modal, Loader, ErrorState,
+  PageHeader, Card, StatCard, Button, Input, MobileInput, Select, Textarea, Table, StatusBadge, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
 
 const inr = (n) => {
@@ -470,7 +470,7 @@ export function EmployeeModal({ user, branches = [], subAdmins = [], onClose, on
           onChange={set('password')}
         />
         <Input label="Employee ID" value={form.employeeId} onChange={set('employeeId')} placeholder="e.g. EMP-0001" />
-        <Input label="Mobile" value={form.phone} onChange={set('phone')} />
+        <MobileInput label="Mobile" value={form.phone} onChange={set('phone')} />
         <Input label="Designation" value={form.designation} onChange={set('designation')} placeholder="e.g. Senior Sales Executive" />
         <Select label="Branch" value={form.branch} onChange={set('branch')}>
           <option value="">Unassigned</option>

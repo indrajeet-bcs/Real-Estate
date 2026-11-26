@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { titleCase } from '../../lib/format.js'
 import ImportLeadsModal from '../../components/ImportLeadsModal.jsx'
 import {
-  PageHeader, Card, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState,
+  PageHeader, Card, Button, Input, MobileInput, Select, Table, StatusBadge, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
 
 // Compact icon action buttons (match the branches/inventory row-action style).
@@ -226,12 +226,9 @@ function NewLeadModal({ execs, onClose, onDone }) {
     }>
       <div className="space-y-4">
         <Input label="Full name" required value={form.name} onChange={set('name')} />
-        <Input
+        <MobileInput
           label="Mobile"
           required
-          type="tel"
-          placeholder="10-digit mobile number"
-          maxLength={10}
           value={form.mobile}
           onChange={handleMobileChange}
           onBlur={() => setTouched((t) => ({ ...t, mobile: true }))}

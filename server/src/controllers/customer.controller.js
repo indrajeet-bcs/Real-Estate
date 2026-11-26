@@ -12,6 +12,7 @@ import { writeAudit } from '../middleware/audit.js'
 import { notify, notifyMany } from '../services/notification.service.js'
 import { AUDIT_ACTIONS, MODULES, ROLES, CUSTOMER_STATUS, LEAD_SOURCES, NOTIFICATION_TYPES, BOOKING_STATUS, FOLLOWUP_STATUS, VISIT_STATUS } from '../config/constants.js'
 import { ownershipScope, firmScope } from '../middleware/tenantScope.js'
+import { parseIndianMobile } from '../utils/phoneValidation.js'
 
 const OPEN_LEAD_STATUSES = [CUSTOMER_STATUS.NEW, CUSTOMER_STATUS.IN_PROGRESS, CUSTOMER_STATUS.FOLLOW_UP_DUE]
 
@@ -672,30 +673,33 @@ export const importCustomers = asyncHandler(async (req, res) => {
   const failedRows = []
   const notifyCounts = new Map()
 
-  const normalizePhone = (val) => {
-    if (!val) return ''
-    let d = String(val).replace(/\D/g, '')
-    if (d.length === 12 && d.startsWith('91')) d = d.slice(2)
-    else if (d.length === 11 && d.startsWith('0')) d = d.slice(1)
-    return d
-  }
-
   const validSources = new Set(LEAD_SOURCES)
   const validStatuses = new Set(Object.values(CUSTOMER_STATUS))
 
   for (const row of rows) {
     const name = (row.name || row.fullName || '').toString().trim()
     const rawMobile = row.mobile || row.phoneNumber || row.contact || ''
-    const mobile = normalizePhone(rawMobile)
+    const mobileCheck = parseIndianMobile(rawMobile)
 
     // Failed: missing mandatory fields or invalid format
     if (!name || name.length < 2) {
       failedRows.push({ row, reason: 'Name is required (at least 2 characters)' })
       continue
     }
-    if (!mobile || !/^[6-9]\d{9}$/.test(mobile)) {
-      failedRows.push({ row, reason: 'Invalid mobile: must be 10 digits starting with 6, 7, 8, or 9' })
+    if (!mobileCheck.valid) {
+      failedRows.push({ row, reason: mobileCheck.error })
       continue
+    }
+    const mobile = mobileCheck.mobile
+
+    let altMobile = undefined
+    if (row.altMobile !== undefined && row.altMobile !== null && String(row.altMobile) !== '') {
+      const altCheck = parseIndianMobile(row.altMobile)
+      if (!altCheck.valid) {
+        failedRows.push({ row, reason: `Alternate mobile invalid: ${altCheck.error}` })
+        continue
+      }
+      altMobile = altCheck.mobile
     }
 
     // Duplicate: mobile already exists in CRM or within batch
@@ -766,7 +770,7 @@ export const importCustomers = asyncHandler(async (req, res) => {
       firm: req.user.firm,
       name,
       mobile,
-      altMobile: normalizePhone(row.altMobile) || undefined,
+      altMobile,
       email: row.email ? String(row.email).toLowerCase().trim() : undefined,
       address: row.address?.toString().trim() || undefined,
       occupation: row.occupation?.toString().trim() || undefined,

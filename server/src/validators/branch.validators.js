@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { objectId } from '../utils/validators.common.js'
+import { optionalIndianMobileSchema } from '../utils/phoneValidation.js'
 
 export const createBranchSchema = z.object({
   name: z.string().min(2, 'Branch name is required'),
@@ -7,7 +8,7 @@ export const createBranchSchema = z.object({
   region: z.string().optional(),
   city: z.string().optional(),
   address: z.string().optional(),
-  contactNumber: z.string().optional(),
+  contactNumber: optionalIndianMobileSchema,
   email: z.string().email().optional().or(z.literal('')),
   adminUser: objectId.optional().or(z.literal('')),
   monthlyTarget: z.coerce.number().min(0).optional(),
@@ -22,7 +23,7 @@ export const updateBranchSchema = z.object({
   region: z.string().optional(),
   city: z.string().optional(),
   address: z.string().optional(),
-  contactNumber: z.string().optional(),
+  contactNumber: optionalIndianMobileSchema,
   email: z.string().email().optional().or(z.literal('')),
   adminUser: objectId.optional().or(z.literal('')).or(z.null()),
   monthlyTarget: z.coerce.number().min(0).optional(),

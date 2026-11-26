@@ -4,7 +4,7 @@ import { firmsApi } from '../../api/resources.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate } from '../../lib/format.js'
-import { PageHeader, Button, Card, Loader, ErrorState, Modal, Input } from '../../components/ui.jsx'
+import { PageHeader, Button, Card, Loader, ErrorState, Modal, Input, MobileInput } from '../../components/ui.jsx'
 
 function StatusBadge({ status, type }) {
   const colors = {
@@ -423,8 +423,8 @@ export default function FirmDetailsPage() {
               onChange={(e) => setEditForm(prev => ({ ...prev, officialEmail: e.target.value }))}
               placeholder="e.g. notifications@company.com"
             />
-            <Input 
-              label="Contact Phone" 
+            <MobileInput
+              label="Contact Phone"
               value={editForm.contactPhone}
               onChange={(e) => setEditForm(prev => ({ ...prev, contactPhone: e.target.value }))}
             />

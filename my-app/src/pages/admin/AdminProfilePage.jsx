@@ -5,7 +5,8 @@ import { authApi } from '../../api/auth.api.js'
 import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate, titleCase } from '../../lib/format.js'
-import { PageHeader, Card, Button, Input, Loader } from '../../components/ui.jsx'
+import { PageHeader, Card, Button, Input, MobileInput, Loader } from '../../components/ui.jsx'
+import { validateIndianMobile, extractIndianMobile } from '../../lib/phoneValidation.js'
 
 function Field({ label, value, readOnly }) {
   return (
@@ -70,8 +71,8 @@ function PersonalInfo({ user, editing, onCancel, onSaved }) {
   const toast = useToast()
   const [form, setForm] = useState({
     name: user.name || '',
-    phone: user.phone || '',
-    altMobile: user.altMobile || '',
+    phone: extractIndianMobile(user.phone),
+    altMobile: extractIndianMobile(user.altMobile),
     designation: user.designation || '',
     avatar: user.avatar || '',
   })
@@ -79,6 +80,10 @@ function PersonalInfo({ user, editing, onCancel, onSaved }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   async function save() {
+    const phoneErr = validateIndianMobile(form.phone, { required: true, label: 'Mobile number' })
+    if (phoneErr) return toast.error(phoneErr)
+    const altErr = validateIndianMobile(form.altMobile, { required: false, label: 'Alternate mobile number' })
+    if (altErr) return toast.error(altErr)
     setBusy(true)
     try {
       const { data } = await authApi.updateProfile(form)
@@ -98,8 +103,8 @@ function PersonalInfo({ user, editing, onCancel, onSaved }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Full Name" required value={form.name} onChange={set('name')} />
             <Input label="Designation" value={form.designation} onChange={set('designation')} placeholder="e.g. Company Owner" />
-            <Input label="Mobile Number" required value={form.phone} onChange={set('phone')} />
-            <Input label="Alternate Mobile Number (optional)" value={form.altMobile} onChange={set('altMobile')} />
+            <MobileInput label="Mobile Number" required value={form.phone} onChange={set('phone')} />
+            <MobileInput label="Alternate Mobile Number (optional)" value={form.altMobile} onChange={set('altMobile')} />
           </div>
           <Input label="Profile Photo URL (optional)" value={form.avatar} onChange={set('avatar')} placeholder="https://…" />
           <div className="flex gap-2">

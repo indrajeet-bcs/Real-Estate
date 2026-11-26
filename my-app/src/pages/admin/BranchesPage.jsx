@@ -5,7 +5,7 @@ import { useFetch } from '../../hooks/useFetch.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { exportRowsToCsv } from '../../lib/format.js'
-import { PageHeader, StatCard, Button, Input, Select, Modal, Table, StatusBadge, Loader, ErrorState } from '../../components/ui.jsx'
+import { PageHeader, StatCard, Button, Input, MobileInput, Select, Modal, Table, StatusBadge, Loader, ErrorState } from '../../components/ui.jsx'
 import { TargetStatusBadge } from './BranchDetailsPage.jsx'
 
 // Icon action buttons (match AdminEmployeesPage's compact row-action style).
@@ -304,7 +304,7 @@ function BranchModal({ branch, onClose, onDone }) {
         <Input label="Branch code" value={form.code} onChange={set('code')} placeholder="e.g. MUM-01" />
         <Input label="City" required value={form.city} onChange={set('city')} placeholder="e.g. Mumbai" />
         <Input label="Region" value={form.region} onChange={set('region')} placeholder="e.g. West" />
-        <Input label="Contact number" value={form.contactNumber} onChange={set('contactNumber')} placeholder="e.g. +91 98765 43210" />
+        <MobileInput label="Contact number" value={form.contactNumber} onChange={set('contactNumber')} />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} placeholder="branch@company.com" />
         <div className="sm:col-span-2"><Input label="Address" value={form.address} onChange={set('address')} placeholder="Street, area, landmark" /></div>
         <Input label="Revenue target (₹)" type="number" value={form.monthlyTarget} onChange={set('monthlyTarget')} />

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { optionalIndianMobileSchema } from '../utils/phoneValidation.js'
 
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -31,8 +32,8 @@ export const acceptInvitationSchema = z.object({
 
 export const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name is required').optional(),
-  phone: z.string().optional().or(z.literal('')),
-  altMobile: z.string().optional().or(z.literal('')),
+  phone: optionalIndianMobileSchema,
+  altMobile: optionalIndianMobileSchema,
   designation: z.string().optional().or(z.literal('')),
   avatar: z.string().optional().or(z.literal('')),
   // Personal information (Profile §2).
@@ -42,7 +43,7 @@ export const updateProfileSchema = z.object({
   maritalStatus: z.enum(['single', 'married', 'other', '']).optional(),
   address: z.string().optional().or(z.literal('')),
   emergencyContactName: z.string().optional().or(z.literal('')),
-  emergencyContactNumber: z.string().optional().or(z.literal('')),
+  emergencyContactNumber: optionalIndianMobileSchema,
   notificationPrefs: z.object({
     inApp: z.boolean().optional(),
     email: z.boolean().optional(),

@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { authApi } from '../api/auth.api.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { formatDate, titleCase } from '../lib/format.js'
-import { PageHeader, Card, Button, Input, Loader } from '../components/ui.jsx'
+import { PageHeader, Card, Button, Input, MobileInput, Loader } from '../components/ui.jsx'
+import { validateIndianMobile, extractIndianMobile } from '../lib/phoneValidation.js'
 
 function Field({ label, value, readOnly }) {
   return (
@@ -52,11 +53,13 @@ export default function ProfileSettingsPage() {
 function MyProfile({ user, onSaved }) {
   const toast = useToast()
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({ name: user.name || '', phone: user.phone || '', avatar: user.avatar || '' })
+  const [form, setForm] = useState({ name: user.name || '', phone: extractIndianMobile(user.phone), avatar: user.avatar || '' })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   async function save() {
+    const phoneErr = validateIndianMobile(form.phone, { required: false, label: 'Mobile number' })
+    if (phoneErr) return toast.error(phoneErr)
     setBusy(true)
     try {
       const { data } = await authApi.updateProfile(form)
@@ -86,7 +89,7 @@ function MyProfile({ user, onSaved }) {
         <div className="mt-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Full Name" value={form.name} onChange={set('name')} />
-            <Input label="Mobile Number" value={form.phone} onChange={set('phone')} />
+            <MobileInput label="Mobile Number" value={form.phone} onChange={set('phone')} />
           </div>
           <Input label="Profile Photo URL (optional)" value={form.avatar} onChange={set('avatar')} placeholder="https://…" />
           <div className="flex gap-2">

@@ -12,7 +12,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { formatDate, formatMoney, titleCase, exportRowsToCsv } from '../../lib/format.js'
 import { CUSTOMER_STATUS } from '../../lib/constants.js'
 import {
-  PageHeader, Card, StatCard, Button, Input, Select, Table, StatusBadge, Modal, Loader, ErrorState,
+  PageHeader, Card, StatCard, Button, Input, MobileInput, Select, Table, StatusBadge, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
 import { ScheduleFollowUpModal, ScheduleVisitModal, RequestTransferModal } from './MyLeadsPage.jsx'
 
@@ -869,11 +869,8 @@ function CustomerFormModal({ customer, projects, onClose, onSaved }) {
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Customer Name *" value={form.name} onChange={set('name')} />
-        <Input
+        <MobileInput
           label="Mobile Number *"
-          type="tel"
-          placeholder="10-digit mobile number"
-          maxLength={10}
           value={form.mobile}
           onChange={handleMobileChange}
           onBlur={() => setTouched((t) => ({ ...t, mobile: true }))}

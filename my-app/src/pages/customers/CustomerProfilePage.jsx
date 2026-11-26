@@ -7,7 +7,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { CUSTOMER_STATUS } from '../../lib/constants.js'
 import { formatDate, formatMoney, titleCase } from '../../lib/format.js'
 import {
-  Card, Button, Input, Textarea, Select, StatusBadge, Modal,
+  Card, Button, Input, MobileInput, Textarea, Select, StatusBadge, Modal,
   Loader, ErrorState,
 } from '../../components/ui.jsx'
 
@@ -350,17 +350,14 @@ function EditCustomerModal({ customer, onClose, onDone }) {
     }>
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Name *" value={form.name} onChange={set('name')} />
-        <Input
+        <MobileInput
           label="Mobile *"
-          type="tel"
-          placeholder="10-digit mobile number"
-          maxLength={10}
           value={form.mobile}
           onChange={handleMobileChange}
           onBlur={() => setTouched((t) => ({ ...t, mobile: true }))}
           error={mobileError}
         />
-        <Input label="Alt Mobile" value={form.altMobile} onChange={set('altMobile')} />
+        <MobileInput label="Alt Mobile" value={form.altMobile} onChange={set('altMobile')} />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} />
         <Input label="Occupation" value={form.occupation} onChange={set('occupation')} />
         <Input label="Preferred Location" value={form.preferredLocation} onChange={set('preferredLocation')} />

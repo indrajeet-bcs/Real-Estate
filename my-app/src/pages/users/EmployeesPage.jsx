@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate, titleCase } from '../../lib/format.js'
 import { validateEmailClient } from '../../lib/emailValidation.js'
 import {
-  PageHeader, Button, Input, Select, Table, Pagination, Modal, Loader, ErrorState,
+  PageHeader, Button, Input, MobileInput, Select, Table, Pagination, Modal, Loader, ErrorState,
 } from '../../components/ui.jsx'
 
 // Staff management. `role` fixes which role this page creates: sub-admins (Admin
@@ -123,7 +123,7 @@ function CreateModal({ role, onClose, onDone }) {
         <Input label="Full name" value={form.name} onChange={set('name')} />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} />
         <Input label="Password (optional)" type="password" placeholder="Leave blank to send OTP email" value={form.password} onChange={set('password')} />
-        <Input label="Phone" value={form.phone} onChange={set('phone')} />
+        <MobileInput label="Phone" value={form.phone} onChange={set('phone')} />
         <Input label="Branch" value={form.branch} onChange={set('branch')} />
       </div>
     </Modal>

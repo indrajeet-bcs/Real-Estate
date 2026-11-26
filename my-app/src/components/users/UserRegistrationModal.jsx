@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Modal, Button, Input, Select } from '../ui.jsx'
+import { Modal, Button, Input, MobileInput, Select } from '../ui.jsx'
+import { validateIndianMobile, extractIndianMobile } from '../../lib/phoneValidation.js'
 import { usersApi, branchesApi } from '../../api/resources.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { validateEmailClient } from '../../lib/emailValidation.js'
@@ -212,8 +213,12 @@ export default function UserRegistrationModal({
   const isEmailValid = canEditEmail ? emailClientResult.valid : true
   const isNameValid = form.name.trim().length >= 2
   const isPasswordValid = form.password ? form.password.length >= 8 : true
-  const isPhoneValid = !form.phone || /^[0-9+ -]{7,15}$/.test(form.phone.trim())
+  const phoneError = validateIndianMobile(extractIndianMobile(form.phone), { required: false, label: 'Mobile number' })
+  const emergencyPhoneError = validateIndianMobile(extractIndianMobile(form.emergencyContactNumber), { required: false, label: 'Emergency phone' })
+  const isPhoneValid = !form.phone || !phoneError
+  const isEmergencyPhoneValid = !form.emergencyContactNumber || !emergencyPhoneError
 
+  const canSubmit = isNameValid && isEmailValid && isPasswordValid && isPhoneValid && isEmergencyPhoneValid && !busy
   const handleSave = async (e) => {
     if (e) e.preventDefault()
     if (!form.name.trim() || form.name.trim().length < 2) {
@@ -239,9 +244,14 @@ export default function UserRegistrationModal({
       setActiveTab('credentials')
       return
     }
-    if (form.phone && !isPhoneValid) {
-      setErrorMsg('Please enter a valid phone number (7 to 15 digits)')
+    if (form.phone && phoneError) {
+      setErrorMsg(phoneError)
       setActiveTab('credentials')
+      return
+    }
+    if (form.emergencyContactNumber && emergencyPhoneError) {
+      setErrorMsg(emergencyPhoneError)
+      setActiveTab('profile')
       return
     }
 
@@ -448,18 +458,12 @@ export default function UserRegistrationModal({
             </div>
 
             <div>
-              <div className="mb-1 block text-xs font-semibold text-slate-700">
-                Mobile Number
-              </div>
-              <Input
-                placeholder="e.g. 9876543210"
+              <MobileInput
+                label="Mobile Number"
                 value={form.phone}
                 onChange={(e) => setField('phone', e.target.value)}
-                autoComplete="off"
+                error={form.phone ? phoneError : ''}
               />
-              {!isPhoneValid && (
-                <p className="mt-1 text-[11px] text-rose-500">Please enter a valid phone number</p>
-              )}
             </div>
           </div>
 
@@ -723,13 +727,11 @@ export default function UserRegistrationModal({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
-                  Emergency Phone
-                </label>
-                <Input
-                  placeholder="e.g. 9811223344"
+                <MobileInput
+                  label="Emergency Phone"
                   value={form.emergencyContactNumber}
                   onChange={(e) => setField('emergencyContactNumber', e.target.value)}
+                  error={form.emergencyContactNumber ? emergencyPhoneError : ''}
                 />
               </div>
             </div>

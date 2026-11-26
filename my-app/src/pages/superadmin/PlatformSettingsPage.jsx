@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { PageHeader, Card, Button, Input, Select, Modal } from '../../components/ui.jsx'
+import { PageHeader, Card, Button, Input, MobileInput, Select, Modal } from '../../components/ui.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 
 function Toggle({ label, checked, onChange }) {
@@ -147,7 +147,7 @@ export default function PlatformSettingsPage() {
               <Input label="Platform Name" value={form.platformName} onChange={e => setField('platformName', e.target.value)} />
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Support Email" type="email" value={form.supportEmail} onChange={e => setField('supportEmail', e.target.value)} />
-                <Input label="Support Phone" value={form.supportPhone} onChange={e => setField('supportPhone', e.target.value)} />
+                <MobileInput label="Support Phone" value={form.supportPhone} onChange={e => setField('supportPhone', e.target.value)} />
               </div>
               <Input label="Website URL" value={form.websiteUrl} onChange={e => setField('websiteUrl', e.target.value)} />
               <Input label="Company Address" value={form.companyAddress} onChange={e => setField('companyAddress', e.target.value)} />

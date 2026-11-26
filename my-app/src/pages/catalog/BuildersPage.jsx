@@ -4,7 +4,7 @@ import { useFetch } from '../../hooks/useFetch.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate } from '../../lib/format.js'
-import { PageHeader, Button, Input, Table, Pagination, Modal, Loader, ErrorState } from '../../components/ui.jsx'
+import { PageHeader, Button, Input, MobileInput, Table, Pagination, Modal, Loader, ErrorState } from '../../components/ui.jsx'
 
 // `readOnly` (Super Admin) hides all mutating actions — view-only across firms (§3).
 export default function BuildersPage({ readOnly = false }) {
@@ -87,7 +87,7 @@ function CreateBuilderModal({ onClose, onDone }) {
       <div className="space-y-4">
         <Input label="Builder name" value={form.name} onChange={set('name')} />
         <Input label="Contact person" value={form.contactPerson} onChange={set('contactPerson')} />
-        <Input label="Phone" value={form.phone} onChange={set('phone')} />
+        <MobileInput label="Phone" value={form.phone} onChange={set('phone')} />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} />
       </div>
     </Modal>

@@ -6,6 +6,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { ok, created } from '../utils/apiResponse.js'
 import { ROLES, AUDIT_ACTIONS } from '../config/constants.js'
 import { writeAudit } from '../middleware/audit.js'
+import { parseIndianMobile } from '../utils/phoneValidation.js'
 
 // --- Categories ---
 
@@ -89,15 +90,27 @@ export const listMembers = asyncHandler(async (req, res) => {
 
 export const createMember = asyncHandler(async (req, res) => {
   const { name, role, email, mobile } = req.body
+  const mobileCheck = parseIndianMobile(mobile)
+  if (!mobileCheck.valid) throw ApiError.badRequest(mobileCheck.error)
   const exists = await SupportMember.findOne({ email })
   if (exists) throw ApiError.conflict('Member email already exists')
-  const member = await SupportMember.create({ name, role, email, mobile })
+  const member = await SupportMember.create({ name, role, email, mobile: mobileCheck.mobile })
   return created(res, member, 'Member created')
 })
 
 export const updateMember = asyncHandler(async (req, res) => {
   const { name, role, email, mobile } = req.body
-  const member = await SupportMember.findByIdAndUpdate(req.params.id, { name, role, email, mobile }, { new: true })
+  let normalizedMobile = mobile
+  if (mobile !== undefined && mobile !== '') {
+    const mobileCheck = parseIndianMobile(mobile)
+    if (!mobileCheck.valid) throw ApiError.badRequest(mobileCheck.error)
+    normalizedMobile = mobileCheck.mobile
+  }
+  const member = await SupportMember.findByIdAndUpdate(
+    req.params.id,
+    { name, role, email, mobile: normalizedMobile },
+    { new: true }
+  )
   if (!member) throw ApiError.notFound('Member not found')
   return ok(res, member, 'Member updated')
 })

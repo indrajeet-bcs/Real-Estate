@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, Children } from 'react'
 import { STATUS_COLORS, titleCase } from '../lib/format.js'
+import { extractIndianMobile, sanitizeMobileInput, validateIndianMobile } from '../lib/phoneValidation.js'
 import { useBodyScrollLock, lockBodyScroll } from '../hooks/useBodyScrollLock.js'
 export { useBodyScrollLock, lockBodyScroll }
 
@@ -142,6 +143,100 @@ export function Input({ label, error, required, className = '', type, ...props }
         )}
       </div>
       {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
+    </label>
+  )
+}
+
+export function MobileInput({
+  label,
+  error,
+  required,
+  value = '',
+  onChange,
+  onValueChange,
+  onBlur,
+  placeholder = '10-digit mobile number',
+  className = '',
+  disabled = false,
+  ...props
+}) {
+  const [touched, setTouched] = useState(false)
+  const isRequired = Boolean(required || props.required)
+  const displayVal = extractIndianMobile(value)
+  const autoError = touched ? validateIndianMobile(displayVal, { required: isRequired, label: label || 'Mobile number' }) : ''
+  const shownError = error !== undefined ? error : autoError
+
+  const emitDigits = (digits, origEvent) => {
+    if (onValueChange) onValueChange(digits)
+    if (onChange) {
+      if (origEvent && origEvent.target) {
+        origEvent.target.value = digits
+        onChange(origEvent)
+      } else {
+        onChange({ target: { value: digits, name: props.name } })
+      }
+    }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']
+    if (allowedKeys.includes(e.key)) return
+    if (!/^[0-9]$/.test(e.key)) {
+      e.preventDefault()
+    }
+  }
+
+  const handleChange = (e) => {
+    const digits = sanitizeMobileInput(e.target.value)
+    emitDigits(digits, e)
+  }
+
+  const handlePaste = (e) => {
+    const text = e.clipboardData?.getData('text') || ''
+    if (text) {
+      e.preventDefault()
+      const digits = extractIndianMobile(text)
+      emitDigits(digits, null)
+    }
+  }
+
+  const handleBlur = (e) => {
+    setTouched(true)
+    if (onBlur) onBlur(e)
+  }
+
+  return (
+    <label className="block">
+      {renderFieldLabel(label, isRequired)}
+      <div
+        className={`flex w-full overflow-hidden rounded-lg border bg-white transition focus-within:ring-2 ${
+          shownError
+            ? 'border-red-400 focus-within:border-red-500 focus-within:ring-red-500/20'
+            : 'border-slate-300 focus-within:border-blue-600 focus-within:ring-blue-600/20'
+        } ${disabled ? 'bg-slate-100 opacity-75' : ''} ${className}`}
+      >
+        <span className="inline-flex shrink-0 select-none items-center border-r border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
+          +91
+        </span>
+        <input
+          type="tel"
+          inputMode="numeric"
+          maxLength={10}
+          autoComplete="tel-national"
+          required={isRequired}
+          disabled={disabled}
+          value={displayVal}
+          onKeyDown={handleKeyDown}
+          onChange={handleChange}
+          onPaste={handlePaste}
+          onBlur={handleBlur}
+          placeholder={placeholder}
+          className="w-full min-w-0 bg-transparent px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+          {...props}
+        />
+      </div>
+      {shownError && <span className="mt-1 block text-xs text-red-600">{shownError}</span>}
     </label>
   )
 }

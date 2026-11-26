@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import { objectId } from '../utils/validators.common.js'
+import { optionalIndianMobileSchema } from '../utils/phoneValidation.js'
 
 // Builders
 export const createBuilderSchema = z.object({
   name: z.string().min(2, 'Builder name is required'),
   logo: z.string().optional(),
   contactPerson: z.string().optional(),
-  phone: z.string().optional(),
+  phone: optionalIndianMobileSchema,
   email: z.string().email().optional().or(z.literal('')),
   address: z.string().optional(),
   city: z.string().optional(),

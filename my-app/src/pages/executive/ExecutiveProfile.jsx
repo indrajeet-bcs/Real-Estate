@@ -4,7 +4,8 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { authApi } from '../../api/auth.api.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { formatDate, titleCase } from '../../lib/format.js'
-import { PageHeader, Card, Button, Input, Select, Modal, Loader } from '../../components/ui.jsx'
+import { PageHeader, Card, Button, Input, MobileInput, Select, Modal, Loader } from '../../components/ui.jsx'
+import { validateIndianMobile, extractIndianMobile } from '../../lib/phoneValidation.js'
 
 const DOC_TYPES = [
   ['id_proof', 'ID Proof'], ['address_proof', 'Address Proof'], ['pan', 'PAN Card'],
@@ -102,15 +103,19 @@ function PersonalInformation({ user, onSaved }) {
   const toast = useToast()
   const [editing, setEditing] = useState(false)
   const blank = () => ({
-    phone: user.phone || '', dob: user.dob ? user.dob.slice(0, 10) : '', gender: user.gender || '',
+    phone: extractIndianMobile(user.phone), dob: user.dob ? user.dob.slice(0, 10) : '', gender: user.gender || '',
     bloodGroup: user.bloodGroup || '', maritalStatus: user.maritalStatus || '', address: user.address || '',
-    emergencyContactName: user.emergencyContactName || '', emergencyContactNumber: user.emergencyContactNumber || '',
+    emergencyContactName: user.emergencyContactName || '', emergencyContactNumber: extractIndianMobile(user.emergencyContactNumber),
   })
   const [form, setForm] = useState(blank)
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   async function save() {
+    const phoneErr = validateIndianMobile(form.phone, { required: false, label: 'Mobile number' })
+    if (phoneErr) return toast.error(phoneErr)
+    const emergErr = validateIndianMobile(form.emergencyContactNumber, { required: false, label: 'Emergency contact number' })
+    if (emergErr) return toast.error(emergErr)
     setBusy(true)
     try {
       const { data } = await authApi.updateProfile(form)
@@ -126,7 +131,7 @@ function PersonalInformation({ user, onSaved }) {
     return (
       <Section title="Personal Information">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Mobile Number" value={form.phone} onChange={set('phone')} />
+          <MobileInput label="Mobile Number" value={form.phone} onChange={set('phone')} />
           <Input label="Email Address" value={user.email} disabled />
           <Input label="Date of Birth" type="date" value={form.dob} onChange={set('dob')} />
           <Select label="Gender" value={form.gender} onChange={set('gender')}>
@@ -138,7 +143,7 @@ function PersonalInformation({ user, onSaved }) {
           </Select>
           <div className="sm:col-span-2"><Input label="Address" value={form.address} onChange={set('address')} /></div>
           <Input label="Emergency Contact Name" value={form.emergencyContactName} onChange={set('emergencyContactName')} />
-          <Input label="Emergency Contact Number" value={form.emergencyContactNumber} onChange={set('emergencyContactNumber')} />
+          <MobileInput label="Emergency Contact Number" value={form.emergencyContactNumber} onChange={set('emergencyContactNumber')} />
         </div>
         <div className="mt-4 flex gap-2">
           <Button onClick={save} disabled={busy}>Save</Button>

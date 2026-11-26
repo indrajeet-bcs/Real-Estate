@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ROLES } from '../config/constants.js'
+import { optionalIndianMobileSchema } from '../utils/phoneValidation.js'
 
 // A manager can only create roles strictly below them; enforced again in the
 // controller via role rank. Sub-admin and executive are the creatable roles.
@@ -8,7 +9,7 @@ export const createUserSchema = z.object({
   email: z.string().email('Valid email is required'),
   password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
   role: z.enum([ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE, ROLES.ADMIN]),
-  phone: z.string().optional().or(z.literal('')),
+  phone: optionalIndianMobileSchema,
   branch: z.string().optional().or(z.literal('')),
   team: z.string().optional().or(z.literal('')),
   manager: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable().or(z.literal('')),
@@ -22,14 +23,14 @@ export const createUserSchema = z.object({
   gender: z.string().optional().or(z.literal('')),
   address: z.string().optional().or(z.literal('')),
   emergencyContactName: z.string().optional().or(z.literal('')),
-  emergencyContactNumber: z.string().optional().or(z.literal('')),
+  emergencyContactNumber: optionalIndianMobileSchema,
 })
 
 export const updateUserSchema = z.object({
   name: z.string().min(2).optional(),
   email: z.string().email().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
-  phone: z.string().optional().or(z.literal('')),
+  phone: optionalIndianMobileSchema,
   branch: z.string().optional().or(z.literal('')),
   team: z.string().optional().or(z.literal('')),
   manager: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable().or(z.literal('')),
@@ -43,7 +44,7 @@ export const updateUserSchema = z.object({
   gender: z.string().optional().or(z.literal('')),
   address: z.string().optional().or(z.literal('')),
   emergencyContactName: z.string().optional().or(z.literal('')),
-  emergencyContactNumber: z.string().optional().or(z.literal('')),
+  emergencyContactNumber: optionalIndianMobileSchema,
   role: z.enum([ROLES.SUB_ADMIN, ROLES.SALES_EXECUTIVE, ROLES.ADMIN]).optional(),
   permissions: z.record(z.array(z.string())).optional(),
 })

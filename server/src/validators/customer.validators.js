@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import { CUSTOMER_STATUS, LEAD_SOURCES, INTEREST_LEVEL } from '../config/constants.js'
+import { requiredIndianMobileSchema, optionalIndianMobileSchema } from '../utils/phoneValidation.js'
 
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id')
 
 export const createCustomerSchema = z.object({
   name: z.string().min(2, 'Name is required'),
-  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Must be a valid 10-digit mobile number starting with 6, 7, 8, or 9'),
-  altMobile: z.string().optional().or(z.literal('')).nullable(),
+  mobile: requiredIndianMobileSchema,
+  altMobile: optionalIndianMobileSchema,
   email: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.string().email().optional()),
   address: z.string().optional().or(z.literal('')).nullable(),
   occupation: z.string().optional().or(z.literal('')).nullable(),
