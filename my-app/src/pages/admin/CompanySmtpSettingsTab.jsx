@@ -78,6 +78,7 @@ export default function CompanySmtpSettingsTab() {
   const [showRelayGuide, setShowRelayGuide] = useState(false)
   const [showTestModal, setShowTestModal] = useState(false)
   const [testRecipient, setTestRecipient] = useState('')
+  const [testSuccessNotice, setTestSuccessNotice] = useState('')
 
   const [formData, setFormData] = useState({
     provider: 'smtp',
@@ -93,6 +94,15 @@ export default function CompanySmtpSettingsTab() {
 
   const [statusInfo, setStatusInfo] = useState({
     savedProvider: 'smtp',
+    savedSnapshot: {
+      provider: 'smtp',
+      officialEmail: '',
+      host: '',
+      port: 587,
+      secure: false,
+      username: '',
+      webhookUrl: '',
+    },
     isConfigured: false,
     isVerified: false,
     lastVerifiedAt: null,
@@ -101,6 +111,15 @@ export default function CompanySmtpSettingsTab() {
     lastErrorAt: null,
     lastTestError: null,
   })
+
+  const extractApiError = (err, fallback) => {
+    const detailsMsg = err?.response?.data?.errors?.[0]?.message
+    const baseMsg = err?.response?.data?.message
+    if (detailsMsg && baseMsg && baseMsg !== detailsMsg) {
+      return `${baseMsg}: ${detailsMsg}`
+    }
+    return detailsMsg || baseMsg || err?.message || fallback
+  }
 
   // Permission checks (Super Admin has wildcard, Company Admin has settings permissions)
   const canEdit = can('settings', 'edit') || user?.role === 'super_admin' || user?.role === 'admin'
@@ -114,19 +133,30 @@ export default function CompanySmtpSettingsTab() {
       const data = res.data?.data || {}
       const smtp = data.smtpConfig || {}
       const provider = smtp.provider || 'smtp'
-      setFormData({
+      const officialEmail = data.officialEmail || data.contactEmail || ''
+      const nextForm = {
         provider,
         fromName: smtp.fromName || data.firmName || '',
-        officialEmail: data.officialEmail || data.contactEmail || '',
+        officialEmail,
         host: smtp.host || '',
         port: smtp.port || 587,
         secure: Boolean(smtp.secure),
         username: smtp.username || '',
         webhookUrl: smtp.webhookUrl || '',
         password: '', // Never populate stored secret/password
-      })
+      }
+      setFormData(nextForm)
       setStatusInfo({
         savedProvider: provider,
+        savedSnapshot: {
+          provider,
+          officialEmail,
+          host: nextForm.host,
+          port: Number(nextForm.port),
+          secure: Boolean(nextForm.secure),
+          username: nextForm.username,
+          webhookUrl: nextForm.webhookUrl,
+        },
         isConfigured: Boolean(smtp.isConfigured),
         isVerified: Boolean(smtp.isVerified),
         lastVerifiedAt: smtp.lastVerifiedAt || null,
@@ -136,7 +166,7 @@ export default function CompanySmtpSettingsTab() {
         lastTestError: null,
       })
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to load email delivery configuration', 'error')
+      showToast(extractApiError(err, 'Failed to load email delivery configuration'), 'error')
     } finally {
       setLoading(false)
     }
@@ -148,9 +178,25 @@ export default function CompanySmtpSettingsTab() {
 
   const hasSavedSecretForProvider = statusInfo.hasPassword && formData.provider === statusInfo.savedProvider
   const currentProviderMeta = PROVIDER_OPTIONS.find((opt) => opt.value === formData.provider) || PROVIDER_OPTIONS[0]
+  const savedSnap = statusInfo.savedSnapshot || {}
+  const hasUnsavedProviderSwitch = formData.provider !== statusInfo.savedProvider
+  const hasUnsavedChanges =
+    hasUnsavedProviderSwitch ||
+    Boolean(formData.password?.trim()) ||
+    (formData.officialEmail?.trim() || '') !== (savedSnap.officialEmail || '') ||
+    (formData.provider === 'smtp' && (
+      (formData.host?.trim() || '') !== (savedSnap.host || '') ||
+      Number(formData.port) !== Number(savedSnap.port || 587) ||
+      Boolean(formData.secure) !== Boolean(savedSnap.secure) ||
+      (formData.username?.trim() || '') !== (savedSnap.username || '')
+    )) ||
+    (formData.provider === 'gmail_webhook' && (
+      (formData.webhookUrl?.trim() || '') !== (savedSnap.webhookUrl || '')
+    ))
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
+    setTestSuccessNotice('')
     setFormData((prev) => {
       const next = { ...prev, [name]: type === 'checkbox' ? checked : value }
       // Auto-adjust port if user toggles secure mode
@@ -167,6 +213,7 @@ export default function CompanySmtpSettingsTab() {
       provider: nextProvider,
       password: '',
     }))
+    setTestSuccessNotice('')
     setStatusInfo((prev) => ({ ...prev, lastTestError: null }))
     setShowRelayGuide(nextProvider === 'gmail_webhook')
   }
@@ -178,6 +225,17 @@ export default function CompanySmtpSettingsTab() {
     } catch {
       showToast('Could not copy automatically — please select and copy the script manually', 'warning')
     }
+  }
+
+  const validateWebhookInput = (url) => {
+    const clean = (url || '').trim()
+    if (!clean.startsWith('https://')) {
+      return 'Please enter a valid HTTPS Google Apps Script Web App URL'
+    }
+    if (clean.endsWith('/dev') || clean.includes('/dev?')) {
+      return 'Please use the deployed Web App URL ending in /exec (not the /dev test URL).'
+    }
+    return null
   }
 
   const handleSave = async (e) => {
@@ -210,14 +268,17 @@ export default function CompanySmtpSettingsTab() {
         showToast('Company Official Gmail address is required', 'error')
         return
       }
-      if (!formData.webhookUrl?.trim().startsWith('https://')) {
-        showToast('Please enter a valid HTTPS Google Apps Script Web App URL', 'error')
+      const urlErr = validateWebhookInput(formData.webhookUrl)
+      if (urlErr) {
+        setStatusInfo((prev) => ({ ...prev, lastTestError: urlErr }))
+        showToast(urlErr, 'error')
         return
       }
     }
 
     try {
       setSaving(true)
+      setTestSuccessNotice('')
       setStatusInfo((prev) => ({ ...prev, lastTestError: null }))
       const payload = {
         provider,
@@ -241,10 +302,10 @@ export default function CompanySmtpSettingsTab() {
       const res = await companySmtpApi.update(payload)
       showToast(res.data?.message || 'Email connection verified and settings saved', 'success')
 
-      // Refresh config to reflect updated verified state
+      // Refresh config to reflect newly saved active provider
       await fetchConfig()
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to verify and save email configuration'
+      const msg = extractApiError(err, 'Failed to verify and save email configuration')
       setStatusInfo((prev) => ({ ...prev, lastTestError: msg }))
       showToast(msg, 'error')
     } finally {
@@ -255,16 +316,22 @@ export default function CompanySmtpSettingsTab() {
   const handleTestConnection = async () => {
     if (!canTest) return
 
+    const provider = formData.provider || 'smtp'
+    if (provider === 'gmail_webhook') {
+      const urlErr = validateWebhookInput(formData.webhookUrl)
+      if (urlErr) {
+        setStatusInfo((prev) => ({ ...prev, lastTestError: urlErr }))
+        showToast(urlErr, 'error')
+        return
+      }
+    }
+
     try {
       setTesting(true)
+      setTestSuccessNotice('')
       setStatusInfo((prev) => ({ ...prev, lastTestError: null }))
 
-      const provider = formData.provider || 'smtp'
-      const usingSavedConfig = provider === statusInfo.savedProvider && !formData.password?.trim() && (
-        provider === 'smtp' ? Boolean(hasSavedSecretForProvider) :
-        provider === 'gmail_webhook' ? false :
-        Boolean(hasSavedSecretForProvider)
-      )
+      const usingSavedConfig = !hasUnsavedChanges
 
       const testPayload = { provider }
       if (provider === 'smtp') {
@@ -280,14 +347,18 @@ export default function CompanySmtpSettingsTab() {
         testPayload.password = formData.password.trim()
       }
 
-      const res = await companySmtpApi.testConnection(
-        usingSavedConfig && provider === 'smtp' ? {} : testPayload
-      )
+      const res = await companySmtpApi.testConnection(usingSavedConfig ? {} : testPayload)
 
-      showToast(res.data?.message || 'Email Connection Verified Successfully!', 'success')
-      await fetchConfig()
+      if (usingSavedConfig) {
+        showToast(res.data?.message || 'Email Connection Verified Successfully!', 'success')
+        await fetchConfig()
+      } else {
+        const notice = `Connection test passed for ${currentProviderMeta.shortLabel}! Now click "Save & Test Connection" to activate it.`
+        setTestSuccessNotice(notice)
+        showToast(notice, 'success')
+      }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Connection test failed'
+      const msg = extractApiError(err, 'Connection test failed')
       setStatusInfo((prev) => ({ ...prev, lastTestError: msg, isVerified: false }))
       showToast(msg, 'error')
     } finally {
@@ -298,6 +369,11 @@ export default function CompanySmtpSettingsTab() {
   const handleSendTestEmail = async (e) => {
     e?.preventDefault()
     if (!canSendTest) return
+
+    if (hasUnsavedChanges) {
+      showToast(`Please click "Save & Test Connection" first to save ${currentProviderMeta.shortLabel} before sending a test email.`, 'warning')
+      return
+    }
 
     if (!testRecipient?.trim()) {
       showToast('Please enter a recipient email address', 'error')
@@ -314,7 +390,9 @@ export default function CompanySmtpSettingsTab() {
       setTestRecipient('')
       await fetchConfig()
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to send test email', 'error')
+      const msg = extractApiError(err, 'Failed to send test email')
+      setStatusInfo((prev) => ({ ...prev, lastTestError: msg }))
+      showToast(msg, 'error')
     } finally {
       setSendingTest(false)
     }
@@ -758,6 +836,31 @@ export default function CompanySmtpSettingsTab() {
             )}
           </div>
 
+          {/* Inline Form Feedback */}
+          {hasUnsavedChanges && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3.5 py-2.5 text-xs text-amber-900 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-amber-600">warning</span>
+              <span>
+                Unsaved changes: <strong>{currentProviderMeta.shortLabel}</strong> is selected below, while the server is still using{' '}
+                <strong>{savedProviderMeta.shortLabel}</strong>. Click <strong>Save &amp; Test Connection</strong> to save &amp; activate it.
+              </span>
+            </div>
+          )}
+
+          {testSuccessNotice && (
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3.5 py-2.5 text-xs text-emerald-800 font-medium flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+              <span>{testSuccessNotice}</span>
+            </div>
+          )}
+
+          {displayedError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs text-red-700 font-medium flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-red-600">error</span>
+              <span>{displayedError}</span>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -792,7 +895,8 @@ export default function CompanySmtpSettingsTab() {
                     setTestRecipient((prev) => prev || user?.email || '')
                     setShowTestModal(true)
                   }}
-                  disabled={testing || saving || !statusInfo.isConfigured}
+                  disabled={testing || saving || !statusInfo.isConfigured || hasUnsavedChanges}
+                  title={hasUnsavedChanges ? 'Save & Test Connection first before sending a test email' : ''}
                 >
                   <span className="material-symbols-outlined text-[18px]">send</span>
                   Send Test Email
@@ -826,7 +930,7 @@ export default function CompanySmtpSettingsTab() {
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                 <span className="material-symbols-outlined text-blue-600">forward_to_inbox</span>
-                Send SMTP Test Email
+                Send Test Email ({savedProviderMeta.shortLabel})
               </h3>
               <button
                 type="button"
@@ -839,7 +943,7 @@ export default function CompanySmtpSettingsTab() {
 
             <form onSubmit={handleSendTestEmail} className="p-5 space-y-4">
               <p className="text-xs text-slate-500">
-                Enter an email address to verify real-world message delivery from your company's SMTP server.
+                Enter an email address to verify real-world delivery using your saved <strong>{savedProviderMeta.shortLabel}</strong> configuration.
               </p>
 
               <div>
