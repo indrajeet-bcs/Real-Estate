@@ -1,46 +1,6 @@
-import { useState } from 'react'
-import { flushSync } from 'react-dom'
-import { Link, useNavigate } from 'react-router-dom'
-
-/**
- * Navigates from Landing Page to /login using the View Transitions API
- * (with graceful fallback) so the brand mark glides smoothly into Login.
- */
-function useSmoothLoginNavigate() {
-  const navigate = useNavigate()
-
-  return function handleLoginClick(e) {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
-      return
-    }
-    e.preventDefault()
-
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-
-    if (!document.startViewTransition || reduceMotion) {
-      window.scrollTo({ top: 0, behavior: 'instant' })
-      navigate('/login', { state: { fromLanding: !reduceMotion } })
-      return
-    }
-
-    const rootEl = document.documentElement
-    rootEl.setAttribute('data-view-transition', 'landing-to-login')
-
-    const transition = document.startViewTransition(() => {
-      flushSync(() => {
-        window.scrollTo({ top: 0, behavior: 'instant' })
-        navigate('/login')
-      })
-    })
-
-    transition.finished.finally(() => {
-      rootEl.removeAttribute('data-view-transition')
-      document.getElementById('login-heading')?.focus({ preventScroll: true })
-    })
-  }
-}
+import { useLayoutEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { notifyRouteCommitted, useSmoothRouteNavigate } from '../../lib/smoothNavigate.js'
 
 // ─── Feature data ────────────────────────────────────────────────────────────
 const FEATURES = [
@@ -175,7 +135,11 @@ function Hero({ onLoginClick }) {
         </div>
 
         {/* Headline */}
-        <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+        <h1
+          id="landing-heading"
+          tabIndex={-1}
+          className="text-4xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-5xl lg:text-6xl"
+        >
           Close More Deals with
           <br />
           <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
@@ -369,7 +333,15 @@ function Footer({ onLoginClick }) {
 
 // ─── Main Landing Page ────────────────────────────────────────────────────────
 export default function LandingPage() {
-  const handleLoginClick = useSmoothLoginNavigate()
+  useLayoutEffect(() => {
+    notifyRouteCommitted('/')
+  }, [])
+
+  const handleLoginClick = useSmoothRouteNavigate({
+    to: '/login',
+    transitionType: 'landing-to-login',
+    focusTargetId: 'login-heading',
+  })
 
   return (
     <div className="min-h-screen">

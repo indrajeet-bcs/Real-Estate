@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { ROLE_HOME } from '../../lib/constants.js'
+import { notifyRouteCommitted, useSmoothRouteNavigate } from '../../lib/smoothNavigate.js'
 
 export default function LoginPage() {
   const { login, isAuthenticated, user, loading } = useAuth()
@@ -10,13 +11,23 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  useLayoutEffect(() => {
+    notifyRouteCommitted('/login')
+  }, [])
+
+  const handleBackToLanding = useSmoothRouteNavigate({
+    to: '/',
+    transitionType: 'login-to-landing',
+    focusTargetId: 'landing-heading',
+  })
+
   const useFallbackEnter =
-    Boolean(location.state?.fromLanding) &&
+    Boolean(location.state?.smoothNav || location.state?.fromLanding) &&
     typeof document !== 'undefined' &&
     !document.startViewTransition
 
   useEffect(() => {
-    if (location.state?.fromLanding) {
+    if (location.state?.smoothNav || location.state?.fromLanding) {
       document.getElementById('login-heading')?.focus({ preventScroll: true })
     }
   }, [location.state])
@@ -62,6 +73,19 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8 sm:py-12">
       <div className={`w-full max-w-md ${useFallbackEnter ? 'crm-login-fallback-enter' : ''}`}>
+        <div className="mb-5">
+          <Link
+            to="/"
+            onClick={handleBackToLanding}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/70 hover:text-slate-900"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+            </svg>
+            Back to Home
+          </Link>
+        </div>
+
         <div className="mb-8 text-center">
           <div className="crm-brand-mark mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-xl font-bold text-white">
             RE
