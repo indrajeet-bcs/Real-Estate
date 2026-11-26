@@ -46,7 +46,8 @@ function getPlatformTransporter() {
     host: env.email.host || 'smtp.gmail.com',
     port: Number(env.email.port) || 465,
     secure: env.email.secure || Number(env.email.port) === 465,
-    connectionTimeout: 7000,
+    family: 4,
+    connectionTimeout: 6000,
     greetingTimeout: 5000,
     socketTimeout: 10000,
     auth: {
@@ -73,9 +74,10 @@ function buildSmtpTransporter({ host, port, secure, username, plainPassword }) {
     host: cleanHost,
     port: numPort,
     secure: isSecure,
-    connectionTimeout: 8000, // 8s connect timeout
-    greetingTimeout: 6000,   // 6s greeting timeout
-    socketTimeout: 12000,    // 12s socket timeout
+    family: 4, // Force IPv4 so Linux/cloud hosts don't stall on IPv6 routes
+    connectionTimeout: 6000, // 6s connect timeout
+    greetingTimeout: 5000,   // 5s greeting timeout
+    socketTimeout: 10000,    // 10s socket timeout
     auth: {
       user: username.trim(),
       pass: normalizedPass,
@@ -83,10 +85,207 @@ function buildSmtpTransporter({ host, port, secure, username, plainPassword }) {
   })
 }
 
+function isNetworkTimeoutError(err) {
+  const msg = String(err?.message || '').toLowerCase()
+  return (
+    err?.code === 'ETIMEDOUT' ||
+    err?.code === 'ESOCKET' ||
+    err?.code === 'ECONNREFUSED' ||
+    err?.code === 'ENETUNREACH' ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('econnrefused')
+  )
+}
+
+async function recordDeliveryOutcome(firmId, success, errorMessage = '') {
+  if (!firmId) return
+  try {
+    if (success) {
+      await Firm.findByIdAndUpdate(firmId, {
+        $set: { 'smtpConfig.lastError': '', 'smtpConfig.lastErrorAt': null },
+      })
+    } else {
+      await Firm.findByIdAndUpdate(firmId, {
+        $set: {
+          'smtpConfig.lastError': String(errorMessage || 'Email delivery failed').slice(0, 500),
+          'smtpConfig.lastErrorAt': new Date(),
+        },
+      })
+    }
+  } catch {
+    // Non-fatal metadata update
+  }
+}
+
+async function sendViaHttpsProvider({ provider, apiKeyOrSecret, webhookUrl, fromName, fromEmail, to, subject, html, text }) {
+  try {
+    if (provider === 'brevo_api') {
+      const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': String(apiKeyOrSecret || '').trim(),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: fromName, email: fromEmail },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+          textContent: text,
+        }),
+        signal: AbortSignal.timeout(10000),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        return { sent: false, error: data?.message || `Brevo API error (${resp.status})` }
+      }
+      return { sent: true, messageId: data?.messageId || 'brevo-ok' }
+    }
+
+    if (provider === 'resend_api') {
+      const resp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${String(apiKeyOrSecret || '').trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: `"${fromName}" <${fromEmail}>`,
+          to: [to],
+          subject,
+          html,
+          text,
+        }),
+        signal: AbortSignal.timeout(10000),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        return { sent: false, error: data?.message || `Resend API error (${resp.status})` }
+      }
+      return { sent: true, messageId: data?.id || 'resend-ok' }
+    }
+
+    if (provider === 'gmail_webhook') {
+      const url = String(webhookUrl || '').trim()
+      if (!url.startsWith('https://')) {
+        return { sent: false, error: 'Invalid Gmail HTTPS Web App URL' }
+      }
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send',
+          secret: String(apiKeyOrSecret || '').trim(),
+          to,
+          subject,
+          html,
+          text,
+          fromName,
+        }),
+        signal: AbortSignal.timeout(12000),
+      })
+      const rawText = await resp.text().catch(() => '')
+      let data = null
+      try { data = JSON.parse(rawText) } catch {}
+      if (!resp.ok || !data || data.success !== true) {
+        return {
+          sent: false,
+          error: data?.error || data?.message || `Gmail Relay returned an unexpected response (${resp.status}). Verify the Web App URL and ensure "Who has access" is set to "Anyone".`,
+        }
+      }
+      return { sent: true, messageId: data?.messageId || 'gmail-webhook-ok' }
+    }
+
+    return { sent: false, error: `Unsupported email provider: ${provider}` }
+  } catch (err) {
+    return { sent: false, error: err?.message || 'HTTPS email request failed' }
+  }
+}
+
 /**
- * Verify plain SMTP credentials via Nodemailer's transporter.verify() before saving.
+ * Verify provider credentials (SMTP handshake, Brevo/Resend key, or Gmail Webhook ping).
  */
-export async function verifySmtpCredentials({ host, port, secure, username, plainPassword }) {
+export async function verifyProviderCredentials({
+  provider = 'smtp',
+  host,
+  port,
+  secure,
+  username,
+  plainPassword,
+  webhookUrl,
+}) {
+  if (provider === 'brevo_api') {
+    if (!plainPassword?.trim()) {
+      return { success: false, error: 'Brevo API Key is required.' }
+    }
+    try {
+      const resp = await fetch('https://api.brevo.com/v3/account', {
+        method: 'GET',
+        headers: { 'api-key': plainPassword.trim(), Accept: 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        return { success: false, error: data?.message || `Brevo authentication failed (${resp.status}).` }
+      }
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: `Could not reach Brevo API: ${err.message}` }
+    }
+  }
+
+  if (provider === 'resend_api') {
+    if (!plainPassword?.trim()) {
+      return { success: false, error: 'Resend API Key is required.' }
+    }
+    try {
+      const resp = await fetch('https://api.resend.com/domains', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${plainPassword.trim()}` },
+        signal: AbortSignal.timeout(8000),
+      })
+      const data = await resp.json().catch(() => ({}))
+      // Sending-only Resend keys are valid even if restricted from listing domains
+      const isSendingOnly = resp.status === 401 && String(data?.message || '').toLowerCase().includes('restricted to only send')
+      if (!resp.ok && !isSendingOnly) {
+        return { success: false, error: data?.message || `Resend authentication failed (${resp.status}).` }
+      }
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: `Could not reach Resend API: ${err.message}` }
+    }
+  }
+
+  if (provider === 'gmail_webhook') {
+    const url = String(webhookUrl || '').trim()
+    if (!url.startsWith('https://')) {
+      return { success: false, error: 'A valid HTTPS Google Apps Script Web App URL is required.' }
+    }
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ping', secret: String(plainPassword || '').trim() }),
+        signal: AbortSignal.timeout(10000),
+      })
+      const rawText = await resp.text().catch(() => '')
+      let data = null
+      try { data = JSON.parse(rawText) } catch {}
+      if (!resp.ok || !data || data.success !== true) {
+        return {
+          success: false,
+          error: data?.error || `Gmail Relay verification failed (${resp.status}). Ensure "Who has access" is set to "Anyone" and the Web App URL is current.`,
+        }
+      }
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: `Could not reach Gmail Relay URL: ${err.message}` }
+    }
+  }
+
+  // Standard SMTP verification with automatic 587 -> 465 SSL fallback on timeout
   if (!host || !username || !plainPassword) {
     return {
       success: false,
@@ -99,6 +298,35 @@ export async function verifySmtpCredentials({ host, port, secure, username, plai
     await transporter.verify()
     return { success: true }
   } catch (err) {
+    // If port 587 STARTTLS timed out, retry once on port 465 SSL automatically
+    if (Number(port) === 587 && !secure && isNetworkTimeoutError(err)) {
+      const sslTransporter = buildSmtpTransporter({ host, port: 465, secure: true, username, plainPassword })
+      try {
+        await sslTransporter.verify()
+        return { success: true, fallbackPort: 465, fallbackSecure: true }
+      } catch (sslErr) {
+        if (isNetworkTimeoutError(sslErr)) {
+          return {
+            success: false,
+            error: `SMTP ports 587 and 465 timed out (${sslErr.message}). If hosted on Render Free Tier, outbound SMTP ports are blocked — switch Delivery Method to "Brevo HTTPS API" or "Gmail HTTPS Relay" (Port 443).`,
+          }
+        }
+        return {
+          success: false,
+          error: sslErr.message || 'SMTP connection verification failed.',
+        }
+      } finally {
+        try { sslTransporter.close?.() } catch {}
+      }
+    }
+
+    if (isNetworkTimeoutError(err)) {
+      return {
+        success: false,
+        error: `SMTP connection timed out (${err.message}). If hosted on Render Free Tier, outbound SMTP ports are blocked — switch Delivery Method to "Brevo HTTPS API" or "Gmail HTTPS Relay" (Port 443).`,
+      }
+    }
+
     return {
       success: false,
       error: err.message || 'SMTP connection verification failed. Check host, port, security mode, and credentials.',
@@ -107,6 +335,9 @@ export async function verifySmtpCredentials({ host, port, secure, username, plai
     try { transporter.close?.() } catch {}
   }
 }
+
+// Keep alias export for backwards compatibility
+export const verifySmtpCredentials = verifyProviderCredentials
 
 /**
  * Constructs or retrieves a company-specific Nodemailer transporter.
@@ -165,8 +396,9 @@ async function getCompanyTransporter(firm) {
 }
 
 /**
- * Send an email dynamically using a company's verified SMTP configuration.
- * Never uses another company's SMTP credentials.
+ * Send an email dynamically using a company's verified mail configuration
+ * (supports Standard SMTP with IPv4/465 retry, Brevo API, Resend API, or Gmail HTTPS Relay).
+ * Never uses another company's credentials.
  */
 export async function sendCompanyEmail({ firmId, to, subject, html, text }) {
   if (!firmId) {
@@ -178,8 +410,72 @@ export async function sendCompanyEmail({ firmId, to, subject, html, text }) {
     return { sent: false, error: 'Company not found' }
   }
 
-  const smtp = firm.smtpConfig
-  if (!smtp || !smtp.host || !smtp.username || !smtp.passwordEncrypted) {
+  const smtp = firm.smtpConfig || {}
+  const provider = smtp.provider || 'smtp'
+  const senderEmail = firm.officialEmail || smtp.username
+  const fromDisplayName = (smtp.fromName || firm.name || 'Real Estate CRM').replace(/"/g, '')
+  const fromAddress = `"${fromDisplayName}" <${senderEmail}>`
+
+  // Route HTTPS providers over Port 443 (works on Render Free Tier where SMTP ports are blocked)
+  if (provider === 'brevo_api' || provider === 'resend_api' || provider === 'gmail_webhook') {
+    const hasSecret = Boolean(smtp.passwordEncrypted && smtp.passwordEncrypted.length > 0)
+    if (provider !== 'gmail_webhook' && !hasSecret) {
+      return {
+        sent: false,
+        notConfigured: true,
+        message: `Email API key is not configured for ${firm.name}.`,
+      }
+    }
+    if (provider === 'gmail_webhook' && !smtp.webhookUrl) {
+      return {
+        sent: false,
+        notConfigured: true,
+        message: `Gmail Relay Web App URL is not configured for ${firm.name}.`,
+      }
+    }
+
+    let plainSecret = ''
+    if (hasSecret) {
+      try {
+        plainSecret = decryptSmtpPassword(smtp.passwordEncrypted)
+      } catch (err) {
+        const msg = `Failed to decrypt ${provider} credentials for ${firm.name}: ${err.message}`
+        await recordDeliveryOutcome(firmId, false, msg)
+        return { sent: false, error: msg, message: msg }
+      }
+    }
+
+    const res = await sendViaHttpsProvider({
+      provider,
+      apiKeyOrSecret: plainSecret,
+      webhookUrl: smtp.webhookUrl,
+      fromName: fromDisplayName,
+      fromEmail: senderEmail,
+      to,
+      subject,
+      html,
+      text,
+    })
+
+    if (res.sent) {
+      await recordDeliveryOutcome(firmId, true)
+      // eslint-disable-next-line no-console
+      console.log(`[email] Sent message ${res.messageId} to ${to} via ${firm.name} [${provider}] (${senderEmail})`)
+      return { sent: true, messageId: res.messageId, from: fromAddress }
+    }
+
+    // eslint-disable-next-line no-console
+    console.error(`[email] Failed via ${firm.name} [${provider}]:`, res.error)
+    await recordDeliveryOutcome(firmId, false, res.error)
+    return {
+      sent: false,
+      error: res.error,
+      message: `Failed to deliver email through ${firm.name} (${provider}): ${res.error}`,
+    }
+  }
+
+  // Standard SMTP transport
+  if (!smtp.host || !smtp.username || !smtp.passwordEncrypted) {
     return {
       sent: false,
       notConfigured: true,
@@ -189,100 +485,138 @@ export async function sendCompanyEmail({ firmId, to, subject, html, text }) {
 
   const transporter = await getCompanyTransporter(firm)
   if (!transporter) {
-    return {
-      sent: false,
-      notConfigured: true,
-      message: `Unable to initialize SMTP transporter for ${firm.name}. Check credentials in Office Settings → Email & SMTP Settings.`,
-    }
+    const errMsg = `Unable to initialize SMTP transporter for ${firm.name}. Re-enter password in Office Settings → Email & SMTP Settings.`
+    await recordDeliveryOutcome(firmId, false, errMsg)
+    return { sent: false, notConfigured: true, message: errMsg }
   }
 
-  const senderEmail = firm.officialEmail || smtp.username
-  const fromDisplayName = (smtp.fromName || firm.name || 'Real Estate CRM').replace(/"/g, '')
-  const fromAddress = `"${fromDisplayName}" <${senderEmail}>`
+  const mailOptions = {
+    from: fromAddress,
+    to,
+    subject,
+    text,
+    html,
+    priority: 'high',
+    headers: {
+      'X-Priority': '1 (Highest)',
+      'X-MSMail-Priority': 'High',
+      'Importance': 'High',
+    },
+  }
 
   try {
-    const info = await transporter.sendMail({
-      from: fromAddress,
-      to,
-      subject,
-      text,
-      html,
-      priority: 'high',
-      headers: {
-        'X-Priority': '1 (Highest)',
-        'X-MSMail-Priority': 'High',
-        'Importance': 'High',
-      },
-    })
-
+    const info = await transporter.sendMail(mailOptions)
+    await recordDeliveryOutcome(firmId, true)
     // eslint-disable-next-line no-console
     console.log(`[email] Sent message ${info.messageId} to ${to} via ${firm.name} (${senderEmail})`)
     return { sent: true, messageId: info.messageId, from: fromAddress }
   } catch (err) {
+    // If port 587 STARTTLS hit a timeout/network block, try port 465 SSL automatically once
+    if (Number(smtp.port) === 587 && !smtp.secure && isNetworkTimeoutError(err)) {
+      let plainPass = ''
+      try {
+        plainPass = decryptSmtpPassword(smtp.passwordEncrypted)
+      } catch {}
+      if (plainPass) {
+        const sslTransporter = buildSmtpTransporter({
+          host: smtp.host,
+          port: 465,
+          secure: true,
+          username: smtp.username,
+          plainPassword: plainPass,
+        })
+        try {
+          const sslInfo = await sslTransporter.sendMail(mailOptions)
+          await recordDeliveryOutcome(firmId, true)
+          // eslint-disable-next-line no-console
+          console.log(`[email] Sent via 465 SSL fallback (${sslInfo.messageId}) to ${to} via ${firm.name}`)
+          return { sent: true, messageId: sslInfo.messageId, from: fromAddress }
+        } catch (sslErr) {
+          err = sslErr
+        } finally {
+          try { sslTransporter.close?.() } catch {}
+        }
+      }
+    }
+
+    const hint = isNetworkTimeoutError(err)
+      ? `${err.message}. Note: Cloud hosts like Render Free Tier block outbound SMTP ports (587/465) — switch Delivery Method in Office Settings to "Brevo HTTPS API" or "Gmail HTTPS Relay".`
+      : err.message
     // eslint-disable-next-line no-console
-    console.error(`[email] Failed to send email via ${firm.name} SMTP:`, err.message)
+    console.error(`[email] Failed to send email via ${firm.name} SMTP:`, hint)
+    await recordDeliveryOutcome(firmId, false, hint)
     return {
       sent: false,
-      error: err.message,
-      message: `Failed to deliver email through ${firm.name} SMTP: ${err.message}`,
+      error: hint,
+      message: `Failed to deliver email through ${firm.name} SMTP: ${hint}`,
     }
   }
 }
 
 /**
- * Verify and test an SMTP connection (with optional credential overrides for live form testing).
+ * Verify and test an email provider connection (with optional credential overrides for live form testing).
  */
 export async function testCompanySmtp(firmId, configOverride = null) {
-  let transporter = null
-  let firmName = 'Company'
-  let closeOnDone = false
-
-  const overrideUser = configOverride?.username || configOverride?.user
-  const overridePass = configOverride?.password || configOverride?.pass
-
-  if (configOverride && configOverride.host && overrideUser && overridePass) {
-    transporter = buildSmtpTransporter({
-      host: configOverride.host,
-      port: configOverride.port,
-      secure: configOverride.secure,
-      username: overrideUser,
-      plainPassword: overridePass,
-    })
-    closeOnDone = true
-  } else if (firmId) {
-    const firm = await Firm.findById(firmId).select('+smtpConfig.passwordEncrypted')
+  let firm = null
+  if (firmId) {
+    firm = await Firm.findById(firmId).select('+smtpConfig.passwordEncrypted')
     if (!firm) throw new Error('Company not found')
-    firmName = firm.name
-    transporter = await getCompanyTransporter(firm)
   }
 
-  if (!transporter) {
-    return { success: false, error: 'SMTP configuration is incomplete. Host, username, and password are required.' }
+  const smtp = firm?.smtpConfig || {}
+  const savedProvider = smtp.provider || 'smtp'
+  const provider = configOverride?.provider || savedProvider
+  const sameProvider = provider === savedProvider
+  const host = configOverride?.host || smtp.host
+  const port = configOverride?.port ?? smtp.port ?? 587
+  const secure = configOverride?.secure !== undefined ? Boolean(configOverride.secure) : Boolean(smtp.secure)
+  const username = configOverride?.username || configOverride?.user || smtp.username
+  const webhookUrl = configOverride?.webhookUrl || smtp.webhookUrl
+
+  let plainPassword = configOverride?.password || configOverride?.pass || ''
+  if (!plainPassword && sameProvider && smtp.passwordEncrypted) {
+    try {
+      plainPassword = decryptSmtpPassword(smtp.passwordEncrypted)
+    } catch {
+      return { success: false, error: 'Saved credentials could not be decrypted. Please re-enter them.' }
+    }
   }
 
-  try {
-    await transporter.verify()
+  const verifyRes = await verifyProviderCredentials({
+    provider,
+    host,
+    port,
+    secure,
+    username,
+    plainPassword,
+    webhookUrl,
+  })
+
+  if (verifyRes.success) {
     if (firmId && !configOverride) {
       await Firm.findByIdAndUpdate(firmId, {
         'smtpConfig.isVerified': true,
         'smtpConfig.lastVerifiedAt': new Date(),
-      })
-    }
-    return { success: true, message: `SMTP connection to ${firmName} email server verified successfully.` }
-  } catch (err) {
-    if (firmId && !configOverride) {
-      await Firm.findByIdAndUpdate(firmId, {
-        'smtpConfig.isVerified': false,
+        'smtpConfig.lastError': '',
+        'smtpConfig.lastErrorAt': null,
       })
     }
     return {
-      success: false,
-      error: err.message || 'SMTP connection verification failed. Please check host, port, credentials, and firewall settings.',
+      success: true,
+      message: `Email connection for ${firm?.name || 'Company'} verified successfully.`,
     }
-  } finally {
-    if (closeOnDone) {
-      try { transporter.close?.() } catch {}
-    }
+  }
+
+  if (firmId && !configOverride) {
+    await Firm.findByIdAndUpdate(firmId, {
+      'smtpConfig.isVerified': false,
+      'smtpConfig.lastError': verifyRes.error,
+      'smtpConfig.lastErrorAt': new Date(),
+    })
+  }
+  return {
+    success: false,
+    error: verifyRes.error || 'Connection verification failed.',
   }
 }
 

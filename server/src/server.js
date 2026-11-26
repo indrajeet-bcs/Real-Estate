@@ -1,6 +1,12 @@
+import dns from 'dns'
 import app from './app.js'
 import { env } from './config/env.js'
 import { connectDB, disconnectDB } from './config/db.js'
+
+// Prefer IPv4 DNS results so Linux/cloud containers don't stall on unreachable IPv6 SMTP routes.
+try {
+  dns.setDefaultResultOrder('ipv4first')
+} catch {}
 
 async function start() {
   try {

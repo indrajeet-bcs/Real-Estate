@@ -2,7 +2,7 @@ import Firm from '../models/Firm.js'
 import { encryptSmtpPassword, decryptSmtpPassword } from '../utils/crypto.js'
 import {
   invalidateTransporterCache,
-  verifySmtpCredentials,
+  verifyProviderCredentials,
   testCompanySmtp,
   sendCompanyTestEmail,
 } from '../utils/email.js'
@@ -46,15 +46,24 @@ export const getSmtpConfig = asyncHandler(async (req, res) => {
     fromEmail: firm.officialEmail || '',
     contactEmail: firm.contactEmail || '',
     smtpConfig: {
+      provider: smtp.provider || 'smtp',
       fromName: smtp.fromName || '',
       host: smtp.host || '',
       port: smtp.port || 587,
       secure: Boolean(smtp.secure),
       username: smtp.username || '',
+      webhookUrl: smtp.webhookUrl || '',
       hasPassword,
-      isConfigured: Boolean(smtp.isConfigured || (smtp.host && smtp.username && hasPassword)),
+      isConfigured: Boolean(
+        smtp.isConfigured ||
+        (smtp.provider === 'gmail_webhook' && smtp.webhookUrl) ||
+        ((smtp.provider === 'brevo_api' || smtp.provider === 'resend_api') && hasPassword) ||
+        (smtp.host && smtp.username && hasPassword)
+      ),
       isVerified: Boolean(smtp.isVerified),
       lastVerifiedAt: smtp.lastVerifiedAt || null,
+      lastError: smtp.lastError || '',
+      lastErrorAt: smtp.lastErrorAt || null,
     },
   }, 'Company SMTP settings retrieved')
 })
@@ -65,73 +74,102 @@ export const updateSmtpConfig = asyncHandler(async (req, res) => {
   const firm = await Firm.findById(firmId).select('+smtpConfig.passwordEncrypted')
   if (!firm) throw ApiError.notFound('Company not found')
 
+  const nextProvider = req.body.provider || firm.smtpConfig?.provider || 'smtp'
   const officialEmailInput = req.body.officialEmail !== undefined ? req.body.officialEmail : req.body.fromEmail
   const fromNameInput = req.body.fromName
   const hostInput = req.body.host
   const portInput = req.body.port
   const secureInput = req.body.secure
   const usernameInput = req.body.username !== undefined ? req.body.username : req.body.user
+  const webhookUrlInput = req.body.webhookUrl
   const passwordInput = req.body.password !== undefined ? req.body.password : req.body.pass
 
   const nextHost = (hostInput !== undefined ? hostInput : firm.smtpConfig?.host || '').trim()
-  const nextPort = portInput !== undefined ? Number(portInput) : (firm.smtpConfig?.port || 587)
-  const nextSecure = secureInput !== undefined ? Boolean(secureInput) : Boolean(firm.smtpConfig?.secure)
+  let nextPort = portInput !== undefined ? Number(portInput) : (firm.smtpConfig?.port || 587)
+  let nextSecure = secureInput !== undefined ? Boolean(secureInput) : Boolean(firm.smtpConfig?.secure)
   const nextUsername = (usernameInput !== undefined ? usernameInput : firm.smtpConfig?.username || '').trim()
+  const nextWebhookUrl = (webhookUrlInput !== undefined ? webhookUrlInput : firm.smtpConfig?.webhookUrl || '').trim()
   const newPlainPassword = typeof passwordInput === 'string' && passwordInput.trim().length > 0
     ? passwordInput.trim()
     : null
 
-  // Resolve plain password for fast-fail verification before saving
+  // Validate official email BEFORE testing provider so we don't save invalid domains
+  let nextOfficialEmail = firm.officialEmail || ''
+  if (officialEmailInput !== undefined) {
+    const trimmedOfficial = officialEmailInput.trim()
+    nextOfficialEmail = trimmedOfficial
+      ? await assertRealEmail(trimmedOfficial, { label: 'Company official email' })
+      : ''
+  }
+
+  const previousProvider = firm.smtpConfig?.provider || 'smtp'
+  const providerChanged = nextProvider !== previousProvider
+
+  // Resolve plain credential/API key/secret for verification before saving
   let passwordForVerify = newPlainPassword
-  if (!passwordForVerify && firm.smtpConfig?.passwordEncrypted) {
+  if (!passwordForVerify && !providerChanged && firm.smtpConfig?.passwordEncrypted) {
     try {
       passwordForVerify = decryptSmtpPassword(firm.smtpConfig.passwordEncrypted)
     } catch {
-      throw ApiError.badRequest('Existing saved SMTP password could not be decrypted. Please re-enter your SMTP password.')
+      if (nextProvider !== 'gmail_webhook') {
+        throw ApiError.badRequest('Existing saved credentials could not be decrypted. Please re-enter them.')
+      }
     }
   }
 
-  if (!passwordForVerify) {
-    throw ApiError.badRequest('SMTP password is required')
+  if (nextProvider !== 'gmail_webhook' && !passwordForVerify) {
+    throw ApiError.badRequest(
+      nextProvider === 'smtp' ? 'SMTP password is required' : 'API key is required'
+    )
   }
 
-  // Run transporter.verify() on save so invalid credentials fail fast with a clear error
-  const verifyResult = await verifySmtpCredentials({
+  // Run verification on save so invalid credentials or blocked ports fail fast with a clear error
+  const verifyResult = await verifyProviderCredentials({
+    provider: nextProvider,
     host: nextHost,
     port: nextPort,
     secure: nextSecure,
     username: nextUsername,
-    plainPassword: passwordForVerify,
+    plainPassword: passwordForVerify || '',
+    webhookUrl: nextWebhookUrl,
   })
 
   if (!verifyResult.success) {
-    throw ApiError.badRequest(`SMTP verification failed: ${verifyResult.error}`)
+    throw ApiError.badRequest(`Email verification failed: ${verifyResult.error}`)
+  }
+
+  if (verifyResult.fallbackPort) {
+    nextPort = verifyResult.fallbackPort
+    nextSecure = Boolean(verifyResult.fallbackSecure)
   }
 
   if (officialEmailInput !== undefined) {
-    const trimmedOfficial = officialEmailInput.trim()
-    firm.officialEmail = trimmedOfficial
-      ? await assertRealEmail(trimmedOfficial, { label: 'Company official email' })
-      : ''
+    firm.officialEmail = nextOfficialEmail
   }
 
   if (!firm.smtpConfig) {
     firm.smtpConfig = {}
   }
 
+  firm.smtpConfig.provider = nextProvider
   if (fromNameInput !== undefined) firm.smtpConfig.fromName = fromNameInput.trim()
   firm.smtpConfig.host = nextHost
   firm.smtpConfig.port = nextPort
   firm.smtpConfig.secure = nextSecure
   firm.smtpConfig.username = nextUsername
+  firm.smtpConfig.webhookUrl = nextWebhookUrl
 
   if (newPlainPassword) {
     firm.smtpConfig.passwordEncrypted = encryptSmtpPassword(newPlainPassword)
+  } else if (providerChanged) {
+    firm.smtpConfig.passwordEncrypted = undefined
   }
 
   firm.smtpConfig.isConfigured = true
   firm.smtpConfig.isVerified = true
   firm.smtpConfig.lastVerifiedAt = new Date()
+  firm.smtpConfig.lastError = ''
+  firm.smtpConfig.lastErrorAt = null
 
   await firm.save()
 
@@ -144,7 +182,7 @@ export const updateSmtpConfig = asyncHandler(async (req, res) => {
     module: MODULES.SETTINGS,
     targetId: firm._id,
     targetLabel: firm.name,
-    description: `Verified and saved company SMTP settings for "${firm.name}" (Credentials changed: ${newPlainPassword ? 'Yes' : 'No'})`,
+    description: `Verified and saved company mail settings [${nextProvider}] for "${firm.name}"`,
   })
 
   return ok(res, {
@@ -153,27 +191,31 @@ export const updateSmtpConfig = asyncHandler(async (req, res) => {
     officialEmail: firm.officialEmail || '',
     fromEmail: firm.officialEmail || '',
     smtpConfig: {
+      provider: firm.smtpConfig.provider,
       fromName: firm.smtpConfig.fromName || '',
       host: firm.smtpConfig.host || '',
       port: firm.smtpConfig.port || 587,
       secure: Boolean(firm.smtpConfig.secure),
       username: firm.smtpConfig.username || '',
-      hasPassword: true,
+      webhookUrl: firm.smtpConfig.webhookUrl || '',
+      hasPassword: Boolean(firm.smtpConfig.passwordEncrypted),
       isConfigured: true,
       isVerified: true,
       lastVerifiedAt: firm.smtpConfig.lastVerifiedAt,
+      lastError: '',
+      lastErrorAt: null,
     },
-  }, 'SMTP connection verified and settings saved successfully')
+  }, 'Email connection verified and settings saved successfully')
 })
 
 // POST /api/company-smtp/test-connection
 export const testConnection = asyncHandler(async (req, res) => {
   const firmId = resolveFirmId(req)
-  const hasOverride = Boolean(
-    req.body.host &&
-    (req.body.username || req.body.user) &&
-    (req.body.password || req.body.pass)
-  )
+  const provider = req.body.provider || 'smtp'
+  const hasOverride =
+    (provider === 'smtp' && Boolean(req.body.host && (req.body.username || req.body.user) && (req.body.password || req.body.pass))) ||
+    ((provider === 'brevo_api' || provider === 'resend_api') && Boolean(req.body.password || req.body.pass)) ||
+    (provider === 'gmail_webhook' && Boolean(req.body.webhookUrl))
 
   const result = await testCompanySmtp(firmId, hasOverride ? req.body : null)
   if (!result.success) {

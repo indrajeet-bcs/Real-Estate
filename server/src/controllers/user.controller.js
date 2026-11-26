@@ -327,21 +327,22 @@ export const createUser = asyncHandler(async (req, res) => {
     module: MODULES.USER,
     targetId: user._id,
     targetLabel: user.name,
-    description: `Created ${role} ${user.email} (Invitation sent: ${emailResult.sent ? 'Yes' : 'No'})`,
+    description: `Created ${role} ${user.email} (Invitation sent: ${emailResult.sent ? 'Yes' : `No - ${emailResult.error || emailResult.message || 'failed'}`})`,
   })
 
+  const failureReason = emailResult.error || emailResult.message || 'Company mail configuration required or delivery failed'
   const responseData = {
     ...user.toJSON(),
     status: user.status,
     emailSent: Boolean(emailResult.sent),
-    emailMessage: emailResult.message || (emailResult.sent ? 'Invitation email sent successfully' : 'Company SMTP configuration required or delivery failed'),
+    emailMessage: emailResult.sent ? 'Invitation email sent successfully' : failureReason,
     // Provide invitation token and setup link in development or when email fails so admin can see/copy it
     ...((!isProd || !emailResult.sent) ? { devInvitationToken: invitationToken, devOtp: otp, setupLink } : {}),
   }
 
   const message = emailResult.sent
     ? 'User created and invitation email sent successfully'
-    : 'User created. Note: Invitation email could not be delivered (Company SMTP configuration required or failed).'
+    : `User created. Note: Invitation email could not be delivered (${failureReason}).`
 
   return created(res, responseData, message)
 })
@@ -650,22 +651,23 @@ export const resendInvitation = asyncHandler(async (req, res) => {
     module: MODULES.USER,
     targetId: target._id,
     targetLabel: target.name,
-    description: `Resent invitation to ${target.email} (Email sent: ${emailResult.sent ? 'Yes' : 'No'})`,
+    description: `Resent invitation to ${target.email} (Email sent: ${emailResult.sent ? 'Yes' : `No - ${emailResult.error || emailResult.message || 'failed'}`})`,
   })
 
+  const failureReason = emailResult.error || emailResult.message || 'Company mail configuration required or delivery failed'
   const responseData = {
     _id: target._id,
     email: target.email,
     name: target.name,
     status: target.status,
     emailSent: Boolean(emailResult.sent),
-    emailMessage: emailResult.message || (emailResult.sent ? 'Invitation email resent successfully' : 'Company SMTP configuration required or delivery failed'),
+    emailMessage: emailResult.sent ? 'Invitation email resent successfully' : failureReason,
     ...((!isProd || !emailResult.sent) ? { devInvitationToken: invitationToken, setupLink } : {}),
   }
 
   const message = emailResult.sent
     ? 'Invitation email resent successfully'
-    : 'Invitation reset. Note: Email could not be sent (Company SMTP configuration required or failed).'
+    : `Invitation reset. Note: Email could not be sent (${failureReason}).`
 
   return ok(res, responseData, message)
 })

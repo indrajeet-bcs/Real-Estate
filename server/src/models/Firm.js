@@ -14,18 +14,26 @@ const firmSchema = new Schema(
     contactEmail: { type: String, trim: true, lowercase: true },
     contactPhone: { type: String, trim: true },
 
-    // Company Official Email & Multi-Company SMTP Configuration
+    // Company Official Email & Multi-Company SMTP / Mail Delivery Configuration
     officialEmail: { type: String, trim: true, lowercase: true },
     smtpConfig: {
+      provider: {
+        type: String,
+        enum: ['smtp', 'brevo_api', 'resend_api', 'gmail_webhook'],
+        default: 'smtp',
+      },
       fromName: { type: String, trim: true, default: '' },
       host: { type: String, trim: true, default: '' },
       port: { type: Number, default: 587 },
       secure: { type: Boolean, default: false },
       username: { type: String, trim: true, default: '' },
+      webhookUrl: { type: String, trim: true, default: '' },
       passwordEncrypted: { type: String, select: false, default: '' },
       isConfigured: { type: Boolean, default: false },
       isVerified: { type: Boolean, default: false },
       lastVerifiedAt: { type: Date },
+      lastError: { type: String, default: '' },
+      lastErrorAt: { type: Date },
     },
     
     // Step 1: Extra Info
