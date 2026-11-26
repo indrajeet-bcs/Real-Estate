@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
@@ -9,6 +9,17 @@ export default function LoginPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const useFallbackEnter =
+    Boolean(location.state?.fromLanding) &&
+    typeof document !== 'undefined' &&
+    !document.startViewTransition
+
+  useEffect(() => {
+    if (location.state?.fromLanding) {
+      document.getElementById('login-heading')?.focus({ preventScroll: true })
+    }
+  }, [location.state])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -50,18 +61,24 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8 sm:py-12">
-      <div className="w-full max-w-md">
+      <div className={`w-full max-w-md ${useFallbackEnter ? 'crm-login-fallback-enter' : ''}`}>
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-xl font-bold text-white">
+          <div className="crm-brand-mark mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-xl font-bold text-white">
             RE
           </div>
-          <h1 className="text-2xl font-semibold text-slate-900">Real Estate CRM</h1>
+          <h1
+            id="login-heading"
+            tabIndex={-1}
+            className="crm-brand-title mx-auto text-2xl font-semibold text-slate-900"
+          >
+            Real Estate CRM
+          </h1>
           <p className="mt-1 text-sm text-slate-600">Sign in to your account</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="space-y-5 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl"
+          className="crm-auth-card space-y-5 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl"
         >
 
           <div>

@@ -1,5 +1,46 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { flushSync } from 'react-dom'
+import { Link, useNavigate } from 'react-router-dom'
+
+/**
+ * Navigates from Landing Page to /login using the View Transitions API
+ * (with graceful fallback) so the brand mark glides smoothly into Login.
+ */
+function useSmoothLoginNavigate() {
+  const navigate = useNavigate()
+
+  return function handleLoginClick(e) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+      return
+    }
+    e.preventDefault()
+
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+    if (!document.startViewTransition || reduceMotion) {
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      navigate('/login', { state: { fromLanding: !reduceMotion } })
+      return
+    }
+
+    const rootEl = document.documentElement
+    rootEl.setAttribute('data-view-transition', 'landing-to-login')
+
+    const transition = document.startViewTransition(() => {
+      flushSync(() => {
+        window.scrollTo({ top: 0, behavior: 'instant' })
+        navigate('/login')
+      })
+    })
+
+    transition.finished.finally(() => {
+      rootEl.removeAttribute('data-view-transition')
+      document.getElementById('login-heading')?.focus({ preventScroll: true })
+    })
+  }
+}
 
 // ─── Feature data ────────────────────────────────────────────────────────────
 const FEATURES = [
@@ -61,7 +102,7 @@ const STATS = [
 ]
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
-function Navbar() {
+function Navbar({ onLoginClick }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
@@ -69,10 +110,10 @@ function Navbar() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white shadow-sm">
+          <div className="crm-brand-mark flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white shadow-sm">
             RE
           </div>
-          <span className="text-base font-semibold text-slate-900">Real Estate CRM</span>
+          <span className="crm-brand-title text-base font-semibold text-slate-900">Real Estate CRM</span>
         </Link>
 
         {/* Desktop nav links */}
@@ -86,6 +127,7 @@ function Navbar() {
         <div className="flex items-center gap-3">
           <Link
             to="/login"
+            onClick={onLoginClick}
             className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 active:bg-blue-800"
           >
             Login
@@ -116,7 +158,7 @@ function Navbar() {
 }
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
-function Hero() {
+function Hero({ onLoginClick }) {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/80 via-indigo-50/30 to-white pb-24 pt-36">
       {/* Background decoration */}
@@ -150,6 +192,7 @@ function Hero() {
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link
             to="/login"
+            onClick={onLoginClick}
             className="rounded-xl bg-blue-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-700 hover:-translate-y-0.5 active:translate-y-0"
           >
             Login to Dashboard →
@@ -244,7 +287,7 @@ function HowItWorks() {
 }
 
 // ─── CTA Banner ───────────────────────────────────────────────────────────────
-function CTABanner() {
+function CTABanner({ onLoginClick }) {
   return (
     <section className="bg-blue-600 py-16">
       <div className="mx-auto max-w-4xl px-6 text-center">
@@ -257,6 +300,7 @@ function CTABanner() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <Link
             to="/login"
+            onClick={onLoginClick}
             className="rounded-xl bg-white px-8 py-3.5 text-base font-semibold text-blue-600 shadow-lg transition hover:bg-slate-50 hover:-translate-y-0.5"
           >
             Login to CRM →
@@ -299,7 +343,7 @@ function Contact() {
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
-function Footer() {
+function Footer({ onLoginClick }) {
   return (
     <footer className="border-t border-slate-200 bg-slate-50 py-10 text-center">
       <div className="mx-auto max-w-6xl px-6">
@@ -313,7 +357,7 @@ function Footer() {
           © {new Date().getFullYear()} Real Estate CRM. All rights reserved.
         </p>
         <div className="mt-4 flex items-center justify-center gap-6">
-          <Link to="/login" className="text-xs text-slate-600 transition hover:text-blue-600">Login</Link>
+          <Link to="/login" onClick={onLoginClick} className="text-xs text-slate-600 transition hover:text-blue-600">Login</Link>
           <a href="#features" className="text-xs text-slate-600 transition hover:text-blue-600">Features</a>
           <a href="#how-it-works" className="text-xs text-slate-600 transition hover:text-blue-600">How It Works</a>
           <a href="#contact" className="text-xs text-slate-600 transition hover:text-blue-600">Contact</a>
@@ -325,17 +369,19 @@ function Footer() {
 
 // ─── Main Landing Page ────────────────────────────────────────────────────────
 export default function LandingPage() {
+  const handleLoginClick = useSmoothLoginNavigate()
+
   return (
     <div className="min-h-screen">
-      <Navbar />
+      <Navbar onLoginClick={handleLoginClick} />
       <main>
-        <Hero />
+        <Hero onLoginClick={handleLoginClick} />
         <Features />
         <HowItWorks />
-        <CTABanner />
+        <CTABanner onLoginClick={handleLoginClick} />
         <Contact />
       </main>
-      <Footer />
+      <Footer onLoginClick={handleLoginClick} />
     </div>
   )
 }

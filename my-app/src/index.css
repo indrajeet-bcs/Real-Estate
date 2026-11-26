@@ -198,3 +198,91 @@ html.dark .thin-scroll::-webkit-scrollbar-thumb {
 html.dark .thin-scroll::-webkit-scrollbar-thumb:hover {
   background-color: #475569;
 }
+
+/* Smooth Landing -> Login View Transition (compositor-only opacity & transform) */
+html[data-view-transition="landing-to-login"] .crm-brand-mark {
+  view-transition-name: crm-brand-mark;
+}
+
+html[data-view-transition="landing-to-login"] .crm-brand-title {
+  view-transition-name: crm-brand-title;
+  width: fit-content;
+}
+
+html[data-view-transition="landing-to-login"] .crm-auth-card {
+  view-transition-name: crm-auth-card;
+}
+
+html[data-view-transition="landing-to-login"]::view-transition-old(root) {
+  animation: crm-landing-out 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-view-transition="landing-to-login"]::view-transition-new(root) {
+  animation: crm-login-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-view-transition="landing-to-login"]::view-transition-group(crm-brand-mark),
+html[data-view-transition="landing-to-login"]::view-transition-group(crm-brand-title) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html[data-view-transition="landing-to-login"]::view-transition-old(crm-brand-mark),
+html[data-view-transition="landing-to-login"]::view-transition-new(crm-brand-mark) {
+  height: 100%;
+  width: 100%;
+}
+
+html[data-view-transition="landing-to-login"]::view-transition-new(crm-auth-card) {
+  animation: crm-card-rise 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes crm-landing-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.985);
+  }
+}
+
+@keyframes crm-login-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes crm-card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Fallback entry animation when document.startViewTransition is unavailable */
+@media (prefers-reduced-motion: no-preference) {
+  .crm-login-fallback-enter {
+    animation: crm-card-rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+#login-heading:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
